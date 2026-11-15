@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda Massaggi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f7f6;--card:#fff;--text:#1f2937;--muted:#6b7280;--primary:#0f766e;--primary-d:#115e59;--border:#e5e7eb;--warn:#b45309;--danger:#dc2626;--ok:#15803d}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:#fff}
+textarea{resize:vertical}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+h1,h2,h3{margin:0}
+.btn{background:var(--primary);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600}
+.btn:hover{background:var(--primary-d)}
+.btn.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn.sec:hover{background:#f3f4f6}
+.btn.danger{background:var(--danger)}
+.btn.ok{background:var(--ok)}
+.btn.sm{padding:5px 9px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.wrap{max-width:1150px;margin:0 auto;padding:16px}
+.topbar{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.topbar .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+.brand{font-weight:800;color:var(--primary);font-size:18px}
+nav{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+nav button{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-weight:600;color:#374151}
+nav button.active{background:#134e4a;color:#fff;border-color:#134e4a}
+.badge-n{background:var(--danger);color:#fff;border-radius:999px;font-size:11px;padding:1px 7px;margin-left:6px}
+.who{font-size:13px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.kpi{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:10px;padding:12px}
+.kpi b{display:block;font-size:24px;color:var(--primary)}
+.kpi span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;color:var(--muted)}
+.tw{overflow-x:auto}
+.muted{color:var(--muted);font-size:13px}
+.empty{text-align:center;color:var(--muted);padding:24px}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
+.st-richiesto{background:#fef3c7;color:#92400e}
+.st-confermato{background:#dcfce7;color:#166534}
+.st-completato{background:#e0e7ff;color:#3730a3}
+.st-annullato,.st-rifiutato{background:#fee2e2;color:#991b1b}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.slot{border:1px solid #99f6e4;background:#f0fdfa;border-radius:10px;padding:8px;text-align:center}
+.slot b{display:block;font-size:17px}
+.slot small{color:var(--muted)}
+.slot:hover:not(:disabled){background:#ccfbf1}
+.slot:disabled{background:#f3f4f6;border-color:var(--border);cursor:not-allowed;opacity:.7}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--border);border-left:1px solid var(--border)}
+.cal .dn{background:#f3f4f6;text-align:center;font-size:12px;font-weight:700;padding:6px}
+.cal .day{min-height:100px;padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:#fff;overflow:hidden}
+.cal .day.out{background:#f9fafb;color:#9ca3af}
+.cal .day.today{outline:2px solid var(--primary);outline-offset:-2px}
+.cal .day .n{font-size:12px;font-weight:700;margin-bottom:3px}
+.ev{display:block;width:100%;text-align:left;border:0;border-radius:5px;padding:3px 5px;margin:2px 0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev.st-completato{opacity:.8}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px}
+.modal-box{background:#fff;border-radius:12px;max-width:620px;width:100%;padding:18px;margin:auto}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.x{background:none;border:0;font-size:20px;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1;min-width:140px}
+.fg{margin-bottom:10px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;z-index:200;max-width:92vw;display:none}
+.toast.err{background:#b91c1c}
+.login{max-width:380px;margin:12vh auto 0}
+.low{background:#fff7ed}
+.cv{white-space:pre-wrap;background:#f9fafb;border-radius:8px;padding:10px;font-size:14px}
+.chips label{display:inline-flex;align-items:center;gap:5px;text-transform:none;font-size:14px;color:var(--text);margin-right:12px;font-weight:500}
+.chips input{width:auto}
+@media(max-width:700px){.cal .day{min-height:70px}.ev{font-size:10px}}
+</style>
+</head>
+<body>
+
+<div id="setup" class="wrap" style="display:none">
+  <div class="card"><h2>Configurazione mancante</h2>
+  <p>Apri il file e inserisci in alto <b>SUPABASE_URL</b> e <b>SUPABASE_ANON_KEY</b> del tuo progetto Supabase (Project Settings &gt; API).</p></div>
+</div>
+
+<div id="loginBox" class="wrap" style="display:none">
+  <div class="card login">
+    <h1 style="color:var(--primary)">Agenda Massaggi</h1>
+    <p class="muted">Accedi con le credenziali che ti sono state date.</p>
+    <form onsubmit="doLogin(event)">
+      <div class="fg"><label>Email</label><input type="email" id="lEmail" required autocomplete="username"></div>
+      <div class="fg"><label>Password</label><input type="password" id="lPass" required autocomplete="current-password"></div>
+      <div id="lMsg" style="color:var(--danger);min-height:18px;font-size:13px"></div>
+      <button class="btn" style="width:100%;margin-top:8px">Accedi</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="topbar"><div class="wrap">
+    <span class="brand">🌿 Agenda Massaggi</span>
+    <nav id="nav"></nav>
+    <span class="who" id="who"></span>
+    <button class="btn sec sm" onclick="doLogout()">Esci</button>
+  </div></div>
+  <div class="wrap" id="view"></div>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box">
+  <div class="modal-head"><h3 id="mTitle"></h3><button class="x" onclick="closeModal()">✕</button></div>
+  <div id="mBody"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ====================== CONFIGURAZIONE ======================
+const SUPABASE_URL = 'https://rwvinkzdgwgazegnfadc.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_U-Z7TWwbr0nUnjZfDjq_Yg_cyYVlRJG';
+const NOTIFICHE_URL = '';   // indirizzo dello script Apps Script per WhatsApp/email (vedi guida). Vuoto = nessun invio
+// ============================================================
+const TZ = 'Europe/Rome';
+const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+const STATI = { richiesto:'In attesa', confermato:'Confermato', completato:'Completato', annullato:'Annullato', rifiutato:'Rifiutato' };
+const NAV = {
+  admin: [['home','Panoramica'],['prenota','Prenota'],['calendario','Calendario'],['strutture','Strutture'],['massaggiatori','Massaggiatori'],['magazzino','Magazzino'],['report','Report'],['accessi','Accessi']],
+  struttura: [['prenota','Prenota'],['calendario','Calendario'],['magazzino','Magazzino'],['report','Report']],
+  massaggiatore: [['richieste','Richieste'],['calendario','Calendario'],['disponibilita','Disponibilità'],['magazzino','Magazzino'],['report','Report'],['profilo','Il mio profilo']]
+};
+
+let sb = null;
+const S = { user:null, profile:null, role:null, strutture:[], massaggiatori:[], appuntamenti:[], richieste:[], articoli:[],
+            page:'', cal:{ y:0, m:0, view:'cal', showOff:false, fStr:'', fMass:'', fStato:'' }, prenota:{ str:'', giorno:'', durata:60 }, mag:{ str:'' }, dispMid:'', rep:null };
+
+// ---------- utilità ----------
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const fDT = new Intl.DateTimeFormat('it-IT', { timeZone:TZ, weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+const fT = new Intl.DateTimeFormat('it-IT', { timeZone:TZ, hour:'2-digit', minute:'2-digit' });
+const fD = new Intl.DateTimeFormat('en-CA', { timeZone:TZ });
+const fmtDT = iso => fDT.format(new Date(iso));
+const fmtTime = iso => fT.format(new Date(iso));
+const romeDay = iso => fD.format(new Date(iso));
+const fmtDay = key => { const [y,m,d] = key.split('-'); return `${d}/${m}/${y}`; };
+const todayKey = () => romeDay(new Date());
+const plusDays = n => romeDay(new Date(Date.now() + n * 864e5));
+const digits = s => String(s || '').replace(/\D/g, '');
+const strById = id => S.strutture.find(s => s.id === id);
+const massById = id => S.massaggiatori.find(m => m.id === id);
+const massName = m => m ? `${m.nome} ${m.cognome}` : '';
+const pill = st => `<span class="pill st-${st}">${STATI[st] || st}</span>`;
+
+function toast(msg, err) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.style.display = 'none'; }, err ? 6000 : 3000);
+}
+function openModal(title, html) { $('mTitle').textContent = title; $('mBody').innerHTML = html; $('modal').style.display = 'flex'; }
+function closeModal() { $('modal').style.display = 'none'; }
+$('modal').addEventListener('mousedown', e => { if (e.target.id === 'modal') closeModal(); });
+
+async function rpc(name, args) { const { data, error } = await sb.rpc(name, args || {}); if (error) throw error; return data; }
+async function run(fn) { try { return await fn(); } catch (e) { toast(e.message || String(e), true); return undefined; } }
+
+async function notifica(payload) {
+  if (!NOTIFICHE_URL) return { skipped:true };
+  try {
+    const { data } = await sb.auth.getSession();
+    const r = await fetch(NOTIFICHE_URL, { method:'POST', body: JSON.stringify({ ...payload, token: data.session ? data.session.access_token : '' }) });
+    return await r.json();
+  } catch (e) { return { ok:false, error:String(e) }; }
+}
+function notifText(r) {
+  if (!r || r.skipped) return ' (invio messaggi non configurato)';
+  if (!r.ok) return ' — ATTENZIONE: messaggi non inviati (' + (r.error || 'errore') + ')';
+  return ` — messaggi inviati: WhatsApp ${r.whatsapp || 0}, email ${r.email || 0}` + (r.errori && r.errori.length ? ' (alcuni errori: ' + r.errori.join('; ') + ')' : '');
+}
+
+// ---------- accesso ----------
+async function boot() {
+  if (SUPABASE_URL.includes('INSERISCI') || SUPABASE_ANON_KEY.includes('INSERISCI')) { $('setup').style.display = 'block'; return; }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') showLogin(); });
+  const { data } = await sb.auth.getSession();
+  if (data.session) await startSession(data.session); else showLogin();
+}
+function showLogin() { $('app').style.display = 'none'; $('loginBox').style.display = 'block'; }
+async function doLogin(e) {
+  e.preventDefault(); $('lMsg').textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email: $('lEmail').value.trim(), password: $('lPass').value });
+  if (error) { $('lMsg').textContent = 'Email o password non corretti.'; return; }
+  $('lPass').value = '';
+  await startSession(data.session);
+}
+async function doLogout() { await sb.auth.signOut(); showLogin(); }
+
+async function startSession(session) {
+  S.user = session.user;
+  const { data, error } = await sb.from('profili').select('*').eq('user_id', session.user.id).maybeSingle();
+  if (error || !data) { $('lMsg').textContent = 'Utente non abilitato. Contatta l\'amministratore.'; await sb.auth.signOut(); showLogin(); return; }
+  S.profile = data; S.role = data.ruolo;
+  $('loginBox').style.display = 'none'; $('app').style.display = 'block';
+  $('who').textContent = `${data.nome || session.user.email} · ${{admin:'Amministratore',struttura:'Struttura',massaggiatore:'Massaggiatore'}[S.role]}`;
+  const d = new Date(); S.cal.y = +romeDay(d).slice(0,4); S.cal.m = +romeDay(d).slice(5,7) - 1;
+  S.prenota.str = S.profile.struttura_id || ''; S.prenota.giorno = plusDays(1);
+  await loadCore();
+  go(NAV[S.role][0][0]);
+}
+
+async function loadCore() {
+  const [st, ms, ap, rq, ar] = await Promise.all([
+    sb.from('strutture').select('*').order('nome'),
+    sb.from('massaggiatori').select('*').order('cognome'),
+    sb.from('appuntamenti').select('*').order('inizio', { ascending:false }).limit(5000),
+    sb.from('richieste').select('*'),
+    sb.from('magazzino_articoli').select('*').order('nome')
+  ]);
+  S.strutture = st.data || []; S.massaggiatori = ms.data || []; S.appuntamenti = ap.data || []; S.richieste = rq.data || []; S.articoli = ar.data || [];
+  renderNav();
+}
+const myPending = () => S.appuntamenti.filter(a => a.stato === 'richiesto' && new Date(a.inizio) > new Date() &&
+  S.richieste.some(r => r.appuntamento_id === a.id && r.massaggiatore_id === S.profile.massaggiatore_id && r.stato === 'inviata'));
+const allPending = () => S.appuntamenti.filter(a => a.stato === 'richiesto' && new Date(a.inizio) > new Date());
+
+function renderNav() {
+  const n = S.role === 'massaggiatore' ? myPending().length : (S.role === 'admin' ? allPending().length : 0);
+  $('nav').innerHTML = NAV[S.role].map(([k, l]) => {
+    const b = (k === 'richieste' || k === 'home') && n ? `<span class="badge-n">${n}</span>` : '';
+    return `<button class="${S.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${b}</button>`;
+  }).join('');
+}
+async function refresh() { await loadCore(); render(); }
+function go(page) { S.page = page; renderNav(); render(); window.scrollTo(0, 0); }
+function render() {
+  const f = { home:vHome, prenota:vPrenota, calendario:vCalendario, strutture:vStrutture, massaggiatori:vMassaggiatori, magazzino:vMagazzino,
+              report:vReport, accessi:vAccessi, richieste:vRichieste, disponibilita:vDisp, profilo:vProfilo }[S.page];
+  if (f) run(f);
+}
+setInterval(async () => { if (S.user && !document.hidden && ['richieste','home'].includes(S.page)) { await loadCore(); render(); } }, 60000);
+
+// ---------- PANORAMICA (admin) ----------
+function vHome() {
+  const now = new Date(), tk = todayKey();
+  const pend = allPending().sort((a,b) => a.inizio.localeCompare(b.inizio));
+  const confOggi = S.appuntamenti.filter(a => a.stato === 'confermato' && romeDay(a.inizio) === tk).length;
+  const conf7 = S.appuntamenti.filter(a => a.stato === 'confermato' && new Date(a.inizio) > now && new Date(a.inizio) < new Date(now.getTime() + 7*864e5)).sort((a,b) => a.inizio.localeCompare(b.inizio));
+  const low = S.articoli.filter(a => Number(a.soglia_minima) > 0 && Number(a.quantita) <= Number(a.soglia_minima));
+  $('view').innerHTML = `
+  <div class="grid g4" style="margin:16px 0">
+    <div class="kpi"><b>${pend.length}</b><span>Richieste in attesa</span></div>
+    <div class="kpi"><b>${confOggi}</b><span>Confermati oggi</span></div>
+    <div class="kpi"><b>${conf7.length}</b><span>Confermati nei prossimi 7 giorni</span></div>
+    <div class="kpi"><b>${low.length}</b><span>Articoli sotto scorta</span></div>
+  </div>
+  <div class="card"><h3 style="margin-bottom:10px">Richieste in attesa di conferma</h3>
+  ${pend.length ? `<div class="tw"><table><tr><th>Quando</th><th>Struttura</th><th>Durata</th><th>Inviata a</th><th></th></tr>${pend.map(a => {
+      const n = S.richieste.filter(r => r.appuntamento_id === a.id && r.stato === 'inviata').length;
+      return `<tr><td>${fmtDT(a.inizio)}</td><td>${esc(strById(a.struttura_id)?.nome)}</td><td>${a.durata_min} min</td><td>${n} massaggiatori</td>
+      <td><button class="btn sm sec" onclick="openAppt('${a.id}')">Dettaglio</button> <button class="btn sm" onclick="resend('${a.id}')">Rinvia messaggi</button></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Nessuna richiesta in attesa.</div>'}</div>
+  <div class="card"><h3 style="margin-bottom:10px">Prossimi appuntamenti confermati</h3>
+  ${conf7.length ? `<div class="tw"><table><tr><th>Quando</th><th>Struttura</th><th>Massaggiatore</th><th>Durata</th></tr>${conf7.map(a =>
+      `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}</td><td>${esc(strById(a.struttura_id)?.nome)}</td><td>${esc(a.massaggiatore_nome)}</td><td>${a.durata_min} min</td></tr>`).join('')}</table></div>` : '<div class="empty">Nessun appuntamento nei prossimi 7 giorni.</div>'}</div>
+  ${low.length ? `<div class="card"><h3 style="margin-bottom:10px">⚠️ Articoli sotto scorta</h3><div class="tw"><table><tr><th>Struttura</th><th>Articolo</th><th>Quantità</th><th>Soglia</th></tr>${low.map(a =>
+      `<tr><td>${esc(strById(a.struttura_id)?.nome)}</td><td>${esc(a.nome)}</td><td>${a.quantita} ${esc(a.unita)}</td><td>${a.soglia_minima}</td></tr>`).join('')}</table></div></div>` : ''}`;
+}
+async function resend(id) { const r = await notifica({ action:'richiesta', appuntamento_id:id }); toast('Messaggi' + notifText(r), r && r.ok === false); }
+
+// ---------- PRENOTA (struttura / admin) ----------
+async function vPrenota() {
+  const P = S.prenota;
+  const strSel = S.role === 'admin'
+    ? `<div><label>Struttura</label><select onchange="S.prenota.str=this.value;vPrenota()"><option value="">— scegli —</option>${S.strutture.filter(s => s.attiva).map(s => `<option value="${s.id}" ${P.str === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : '';
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Richiedi un appuntamento</h2></div>
+    <p class="muted">Le richieste vanno fatte con un preavviso di almeno 3 ore${S.role === 'admin' ? ' (l\'amministratore può derogare)' : ''}. L'appuntamento si conferma quando un massaggiatore accetta.</p>
+    <div class="row" style="margin:12px 0">${strSel}
+      <div><label>Giorno</label><input type="date" min="${todayKey()}" value="${P.giorno}" onchange="S.prenota.giorno=this.value;vPrenota()"></div>
+      <div><label>Durata</label><select onchange="S.prenota.durata=+this.value;vPrenota()">${[30,45,60,90,120,180].map(d => `<option value="${d}" ${P.durata === d ? 'selected' : ''}>${d} minuti</option>`).join('')}</select></div></div>
+    <div id="slots"><div class="empty">Caricamento orari...</div></div></div>`;
+  if (!P.str && S.role === 'admin') { $('slots').innerHTML = '<div class="empty">Scegli la struttura.</div>'; return; }
+  if (!P.giorno) return;
+  const rows = await rpc('disponibilita_slot', { p_giorno: P.giorno, p_durata: P.durata });
+  const adm = S.role === 'admin';
+  const list = rows.filter(r => r.liberi > 0);
+  if (!list.length) { $('slots').innerHTML = '<div class="empty">Nessun massaggiatore disponibile in questo giorno con questa durata. Prova un altro giorno.</div>'; return; }
+  const maxN = Math.max(...list.map(r => r.liberi));
+  $('slots').innerHTML = `<p class="muted" style="margin-bottom:10px">Massaggiatori disponibili nella giornata: fino a <b>${maxN}</b> contemporaneamente. Clicca un orario per richiedere.</p>
+    <div class="slots">${list.map(r => {
+      const ok = r.prenotabile || (adm && new Date(r.inizio) > new Date());
+      return `<button class="slot" ${ok ? '' : 'disabled title="Servono almeno 3 ore di preavviso"'} onclick="askSlot('${r.inizio}',${r.liberi})"><b>${fmtTime(r.inizio)}</b><small>${r.liberi} disponibil${r.liberi === 1 ? 'e' : 'i'}${ok ? '' : '<br>preavviso &lt; 3h'}</small></button>`;
+    }).join('')}</div>`;
+}
+function askSlot(inizio, n) {
+  const P = S.prenota, st = strById(P.str);
+  openModal('Conferma la richiesta', `<p><b>${esc(st ? st.nome : '')}</b><br>${fmtDT(inizio)} · ${P.durata} minuti<br><span class="muted">${n} massaggiatori verranno avvisati: l'appuntamento si conferma quando il primo accetta.</span></p>
+    <form onsubmit="sendRequest(event,'${inizio}')"><div class="fg"><label>Note per il massaggiatore (camera, tipo di trattamento...)</label><textarea id="rqNote" rows="3"></textarea></div>
+    <div class="actions"><button class="btn" id="rqBtn">Invia richiesta</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function sendRequest(e, inizio) {
+  e.preventDefault(); $('rqBtn').disabled = true;
+  const id = await run(() => rpc('richiedi_appuntamento', { p_struttura: S.prenota.str, p_inizio: inizio, p_durata: S.prenota.durata, p_note: $('rqNote').value }));
+  if (!id) { $('rqBtn').disabled = false; vPrenota(); return; }
+  closeModal();
+  const r = await notifica({ action:'richiesta', appuntamento_id:id });
+  toast('Richiesta inviata' + notifText(r), r && r.ok === false);
+  await loadCore(); vPrenota();
+}
+
+// ---------- RICHIESTE (massaggiatore) ----------
+function vRichieste() {
+  const list = myPending().sort((a,b) => a.inizio.localeCompare(b.inizio));
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Richieste di appuntamento</h2><button class="btn sec sm" onclick="refresh()">🔄 Aggiorna</button></div>
+  ${list.length ? list.map(a => { const st = strById(a.struttura_id) || {}; const addr = [st.indirizzo, st.citta].filter(Boolean).join(', ');
+    return `<div class="card" style="border-color:#fcd34d;background:#fffbeb"><b>${fmtDT(a.inizio)}</b> · ${a.durata_min} minuti<br>
+      <b>${esc(st.nome)}</b>${addr ? ` — ${esc(addr)} <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}">mappa</a>` : ''}
+      ${st.telefono ? `<br>📞 <a href="tel:${esc(st.telefono)}">${esc(st.telefono)}</a>` : ''}
+      ${a.note ? `<br><span class="muted">Note: ${esc(a.note)}</span>` : ''}
+      <div class="actions"><button class="btn ok" onclick="confirmAppt('${a.id}')">✔ Confermo la mia disponibilità</button><button class="btn sec" onclick="rejectAppt('${a.id}')">Non posso</button></div></div>`; }).join('')
+    : '<div class="empty">Nessuna richiesta in attesa. Quando una struttura richiede un appuntamento in un orario in cui sei disponibile, lo trovi qui.</div>'}</div>`;
+}
+async function confirmAppt(id) {
+  if (!confirm('Confermi di essere disponibile per questo appuntamento?')) return;
+  const ok = await run(async () => { await rpc('conferma_appuntamento', { p_app: id }); return true; });
+  if (ok) { notifica({ action:'esito', appuntamento_id:id }); toast('Appuntamento confermato ✔'); }
+  closeModal(); await refresh();
+}
+async function rejectAppt(id) {
+  await run(() => rpc('rifiuta_appuntamento', { p_app: id }));
+  closeModal(); await refresh();
+}
+
+// ---------- CALENDARIO ----------
+function filteredAppts() {
+  const C = S.cal;
+  return S.appuntamenti.filter(a => (C.showOff || !['annullato','rifiutato'].includes(a.stato))
+    && (!C.fStr || a.struttura_id === C.fStr) && (!C.fMass || a.massaggiatore_id === C.fMass) && (!C.fStato || a.stato === C.fStato));
+}
+function apLabel(a) {
+  const st = strById(a.struttura_id)?.nome || '';
+  return S.role === 'struttura' ? (a.massaggiatore_nome || 'in attesa') : (S.role === 'massaggiatore' ? st : `${st}${a.massaggiatore_nome ? ' · ' + a.massaggiatore_nome : ''}`);
+}
+function vCalendario() {
+  const C = S.cal, mk = `${C.y}-${pad(C.m + 1)}`;
+  const mn = new Date(Date.UTC(C.y, C.m, 1)).toLocaleDateString('it-IT', { month:'long', year:'numeric', timeZone:'UTC' });
+  const filters = `<div class="row" style="margin-bottom:12px">
+    ${S.role !== 'struttura' ? `<div><label>Struttura</label><select onchange="S.cal.fStr=this.value;vCalendario()"><option value="">Tutte</option>${S.strutture.map(s => `<option value="${s.id}" ${C.fStr === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
+    ${S.role === 'admin' ? `<div><label>Massaggiatore</label><select onchange="S.cal.fMass=this.value;vCalendario()"><option value="">Tutti</option>${S.massaggiatori.map(m => `<option value="${m.id}" ${C.fMass === m.id ? 'selected' : ''}>${esc(massName(m))}</option>`).join('')}</select></div>` : ''}
+    <div><label>Stato</label><select onchange="S.cal.fStato=this.value;vCalendario()"><option value="">Tutti</option>${Object.entries(STATI).map(([k,v]) => `<option value="${k}" ${C.fStato === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+    <div><label>Vista</label><select onchange="S.cal.view=this.value;vCalendario()"><option value="cal" ${C.view === 'cal' ? 'selected' : ''}>Calendario</option><option value="list" ${C.view === 'list' ? 'selected' : ''}>Elenco del mese</option><option value="all" ${C.view === 'all' ? 'selected' : ''}>Elenco di tutto lo storico</option></select></div></div>
+    <label class="chips" style="text-transform:none"><input type="checkbox" ${C.showOff ? 'checked' : ''} onchange="S.cal.showOff=this.checked;vCalendario()" style="width:auto"> mostra annullati e rifiutati</label>`;
+  const all = filteredAppts();
+  let body;
+  if (C.view === 'cal') {
+    const first = (new Date(Date.UTC(C.y, C.m, 1)).getUTCDay() + 6) % 7, nd = new Date(Date.UTC(C.y, C.m + 1, 0)).getUTCDate();
+    const byDay = {}; all.forEach(a => { (byDay[romeDay(a.inizio)] = byDay[romeDay(a.inizio)] || []).push(a); });
+    let cells = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].map(d => `<div class="dn">${d}</div>`).join('');
+    for (let i = 0; i < first; i++) cells += '<div class="day out"></div>';
+    for (let d = 1; d <= nd; d++) {
+      const key = `${mk}-${pad(d)}`, ev = (byDay[key] || []).sort((a,b) => a.inizio.localeCompare(b.inizio));
+      cells += `<div class="day ${key === todayKey() ? 'today' : ''}"><div class="n">${d}</div>${ev.slice(0,3).map(a =>
+        `<button class="ev st-${a.stato}" onclick="openAppt('${a.id}')" title="${esc(apLabel(a))}">${fmtTime(a.inizio)} ${esc(apLabel(a))}</button>`).join('')}${ev.length > 3 ? `<button class="ev" style="background:#e5e7eb" onclick="openDay('${key}')">+${ev.length - 3} altri</button>` : ''}</div>`;
+    }
+    body = `<div class="cal">${cells}</div>`;
+  } else {
+    const rows = (C.view === 'list' ? all.filter(a => romeDay(a.inizio).startsWith(mk)) : all).sort((a,b) => a.inizio.localeCompare(b.inizio));
+    body = rows.length ? `<div class="tw"><table><tr><th>Quando</th><th>Durata</th>${S.role !== 'struttura' ? '<th>Struttura</th>' : ''}<th>Massaggiatore</th><th>Stato</th></tr>${rows.map(a =>
+      `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}</td><td>${a.durata_min} min</td>${S.role !== 'struttura' ? `<td>${esc(strById(a.struttura_id)?.nome)}</td>` : ''}<td>${esc(a.massaggiatore_nome || '—')}</td><td>${pill(a.stato)}</td></tr>`).join('')}</table></div>` : '<div class="empty">Nessun appuntamento.</div>';
+  }
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Calendario</h2>
+    ${C.view !== 'all' ? `<div class="row" style="flex:0 0 auto;align-items:center"><button class="btn sec sm" onclick="calMove(-1)">←</button><b style="min-width:150px;text-align:center;text-transform:capitalize">${mn}</b><button class="btn sec sm" onclick="calMove(1)">→</button></div>` : ''}</div>
+    ${filters}${body}
+    <p class="muted" style="margin-top:10px">${Object.entries(STATI).map(([k,v]) => pill(k)).join(' ')}</p></div>`;
+}
+function calMove(n) { const C = S.cal; C.m += n; if (C.m < 0) { C.m = 11; C.y--; } if (C.m > 11) { C.m = 0; C.y++; } vCalendario(); }
+function openDay(key) {
+  const list = filteredAppts().filter(a => romeDay(a.inizio) === key).sort((a,b) => a.inizio.localeCompare(b.inizio));
+  openModal(fmtDay(key), list.map(a => `<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openAppt('${a.id}')"><b>${fmtTime(a.inizio)}</b> ${esc(apLabel(a))} ${pill(a.stato)}</div>`).join(''));
+}
+function openAppt(id) {
+  const a = S.appuntamenti.find(x => x.id === id); if (!a) return;
+  const st = strById(a.struttura_id) || {}, ended = new Date(a.inizio).getTime() + a.durata_min * 60000 < Date.now();
+  const mine = S.richieste.some(r => r.appuntamento_id === id && r.massaggiatore_id === S.profile.massaggiatore_id && r.stato === 'inviata');
+  const m = massById(a.massaggiatore_id);
+  let act = '';
+  if (S.role === 'massaggiatore' && a.stato === 'richiesto' && mine && !ended) act += `<button class="btn ok" onclick="confirmAppt('${id}')">✔ Confermo</button><button class="btn sec" onclick="rejectAppt('${id}')">Non posso</button>`;
+  if (['admin','massaggiatore'].includes(S.role) && a.stato === 'confermato' && ended && (S.role === 'admin' || a.massaggiatore_id === S.profile.massaggiatore_id)) act += `<button class="btn" onclick="completeAppt('${id}')">Segna come completato</button>`;
+  if (['admin','struttura'].includes(S.role) && ['richiesto','confermato'].includes(a.stato) && !ended) act += `<button class="btn danger" onclick="cancelAppt('${id}')">Annulla appuntamento</button>`;
+  if (S.role === 'admin' && a.stato === 'richiesto' && !ended) act += `<button class="btn sec" onclick="resend('${id}')">Rinvia messaggi</button>`;
+  openModal('Appuntamento', `<table><tr><th>Quando</th><td>${fmtDT(a.inizio)} (${a.durata_min} min)</td></tr>
+    <tr><th>Stato</th><td>${pill(a.stato)}</td></tr>
+    <tr><th>Struttura</th><td>${esc(st.nome)}${S.role !== 'struttura' && (st.indirizzo || st.citta) ? '<br><span class="muted">' + esc([st.indirizzo, st.citta].filter(Boolean).join(', ')) + '</span>' : ''}${S.role !== 'struttura' && st.telefono ? `<br>📞 <a href="tel:${esc(st.telefono)}">${esc(st.telefono)}</a>` : ''}</td></tr>
+    <tr><th>Massaggiatore</th><td>${esc(a.massaggiatore_nome || '— non ancora assegnato')}${S.role === 'admin' && m && m.telefono ? ` · <a target="_blank" rel="noopener" href="https://wa.me/${digits(m.telefono)}">WhatsApp</a>` : ''}</td></tr>
+    <tr><th>Richiesto da</th><td>${esc(a.richiesto_da_nome || '')} il ${fmtDT(a.creato_il)}</td></tr>
+    ${a.note ? `<tr><th>Note</th><td>${esc(a.note)}</td></tr>` : ''}
+    ${S.role === 'admin' ? `<tr><th>Prezzo €</th><td><div class="row"><input type="number" step="0.01" id="apPrezzo" value="${a.prezzo ?? ''}"><button class="btn sm sec" style="flex:0 0 auto" onclick="savePrice('${id}')">Salva</button></div></td></tr>` : (a.prezzo != null && S.role !== 'massaggiatore' ? `<tr><th>Prezzo</th><td>€ ${Number(a.prezzo).toFixed(2)}</td></tr>` : '')}</table>
+    <div class="actions">${act}</div>`);
+}
+async function cancelAppt(id) {
+  if (!confirm('Annullare questo appuntamento?')) return;
+  const ok = await run(async () => { await rpc('annulla_appuntamento', { p_app: id }); return true; });
+  if (ok) { notifica({ action:'annullo', appuntamento_id:id }); toast('Appuntamento annullato'); }
+  closeModal(); await refresh();
+}
+async function completeAppt(id) { await run(() => rpc('completa_appuntamento', { p_app: id })); closeModal(); await refresh(); }
+async function savePrice(id) {
+  const v = $('apPrezzo').value;
+  const { error } = await sb.from('appuntamenti').update({ prezzo: v === '' ? null : Number(v) }).eq('id', id);
+  if (error) return toast(error.message, true);
+  toast('Prezzo salvato'); await loadCore();
+}
+
+// ---------- STRUTTURE (admin) ----------
+function vStrutture() {
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Strutture</h2><button class="btn" onclick="editStruttura()">➕ Nuova struttura</button></div>
+  <div class="tw"><table><tr><th>Nome</th><th>Indirizzo</th><th>Referente</th><th>Contatti</th><th>Stato</th><th></th></tr>${S.strutture.map(s =>
+    `<tr><td><b>${esc(s.nome)}</b></td><td>${esc([s.indirizzo, s.citta].filter(Boolean).join(', '))}</td><td>${esc(s.referente)}</td><td>${esc(s.telefono)}<br>${esc(s.email)}</td>
+     <td>${s.attiva ? 'Attiva' : '<span class="muted">Non attiva</span>'}</td><td><button class="btn sm sec" onclick="editStruttura('${s.id}')">Modifica</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nessuna struttura. Aggiungi la prima.</td></tr>'}</table></div></div>`;
+}
+function editStruttura(id) {
+  const s = id ? strById(id) : { attiva:true };
+  const f = (k, l, t) => `<div class="fg"><label>${l}</label><input type="${t || 'text'}" id="s_${k}" value="${esc(s[k] || '')}"></div>`;
+  openModal(id ? 'Modifica struttura' : 'Nuova struttura', `<form onsubmit="saveStruttura(event,'${id || ''}')">${f('nome','Nome *')}${f('indirizzo','Indirizzo')}${f('citta','Città')}${f('referente','Referente')}${f('telefono','Telefono','tel')}${f('email','Email (riceve le conferme)','email')}
+    <div class="fg"><label>Note</label><textarea id="s_note" rows="2">${esc(s.note || '')}</textarea></div>
+    <label class="chips" style="text-transform:none"><input type="checkbox" id="s_attiva" ${s.attiva ? 'checked' : ''}> Struttura attiva (può richiedere appuntamenti)</label>
+    <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function saveStruttura(e, id) {
+  e.preventDefault();
+  const row = { nome: $('s_nome').value.trim(), indirizzo: $('s_indirizzo').value.trim() || null, citta: $('s_citta').value.trim() || null, referente: $('s_referente').value.trim() || null,
+    telefono: $('s_telefono').value.trim() || null, email: $('s_email').value.trim() || null, note: $('s_note').value.trim() || null, attiva: $('s_attiva').checked };
+  const q = id ? sb.from('strutture').update(row).eq('id', id) : sb.from('strutture').insert(row);
+  const { error } = await q; if (error) return toast(error.message, true);
+  closeModal(); toast('Salvato'); await refresh();
+}
+
+// ---------- MASSAGGIATORI (admin) ----------
+function vMassaggiatori() {
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Massaggiatori</h2><button class="btn" onclick="editMass()">➕ Nuovo massaggiatore</button></div>
+  <div class="grid g2">${S.massaggiatori.map(m => `<div class="card" style="margin:0;${m.attivo ? '' : 'opacity:.6'}"><h3>${esc(massName(m))} ${m.attivo ? '' : '<span class="muted">(non attivo)</span>'}</h3>
+    <p class="muted" style="margin:6px 0">${esc(m.specializzazioni || '')}${m.anni_esperienza ? ` · ${m.anni_esperienza} anni di esperienza` : ''}</p>
+    <p>📞 ${esc(m.telefono || '—')}<br>✉️ ${esc(m.email || '—')}</p>
+    <div class="actions"><button class="btn sm sec" onclick="showCv('${m.id}')">Curriculum</button><button class="btn sm sec" onclick="editMass('${m.id}')">Modifica</button>
+    <button class="btn sm sec" onclick="S.dispMid='${m.id}';go('disponibilita')">Disponibilità</button></div></div>`).join('') || '<div class="empty">Nessun massaggiatore.</div>'}</div></div>`;
+}
+function showCv(id) { const m = massById(id); openModal(massName(m), `<p class="muted">${esc(m.specializzazioni || '')}${m.anni_esperienza ? ` · ${m.anni_esperienza} anni di esperienza` : ''}</p><div class="cv">${esc(m.curriculum || 'Curriculum non inserito.')}</div>`); }
+function editMass(id, self) {
+  const m = id ? massById(id) : { attivo:true };
+  const ro = (S.role !== 'admin') ? 'readonly' : '';
+  const f = (k, l, t, r) => `<div class="fg"><label>${l}</label><input type="${t || 'text'}" id="m_${k}" value="${esc(m[k] ?? '')}" ${r || ''}></div>`;
+  openModal(id ? 'Modifica massaggiatore' : 'Nuovo massaggiatore', `<form onsubmit="saveMass(event,'${id || ''}')"><div class="row">${f('nome','Nome *','text',ro)}${f('cognome','Cognome *','text',ro)}</div>
+    <div class="row">${f('telefono','WhatsApp (con prefisso, es. 393331234567)','tel')}${f('email','Email','email')}</div>
+    ${f('specializzazioni','Specializzazioni (es. decontratturante, linfodrenante)')}${f('anni_esperienza','Anni di esperienza','number')}
+    <div class="fg"><label>Curriculum</label><textarea id="m_curriculum" rows="8">${esc(m.curriculum || '')}</textarea></div>
+    ${S.role === 'admin' ? `<label class="chips" style="text-transform:none"><input type="checkbox" id="m_attivo" ${m.attivo ? 'checked' : ''}> Attivo (riceve richieste)</label>` : ''}
+    <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function saveMass(e, id) {
+  e.preventDefault();
+  const row = { telefono: $('m_telefono').value.trim() || null, email: $('m_email').value.trim() || null, specializzazioni: $('m_specializzazioni').value.trim() || null,
+    anni_esperienza: $('m_anni_esperienza').value === '' ? null : +$('m_anni_esperienza').value, curriculum: $('m_curriculum').value.trim() || null };
+  if (S.role === 'admin') { row.nome = $('m_nome').value.trim(); row.cognome = $('m_cognome').value.trim(); row.attivo = $('m_attivo').checked; }
+  const q = id ? sb.from('massaggiatori').update(row).eq('id', id) : sb.from('massaggiatori').insert(row);
+  const { error } = await q; if (error) return toast(error.message, true);
+  closeModal(); toast('Salvato'); await refresh();
+}
+function vProfilo() {
+  const m = massById(S.profile.massaggiatore_id);
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Il mio profilo</h2><button class="btn" onclick="editMass('${m ? m.id : ''}')">Modifica</button></div>
+  ${m ? `<h3>${esc(massName(m))}</h3><p class="muted">${esc(m.specializzazioni || '')}${m.anni_esperienza ? ` · ${m.anni_esperienza} anni` : ''}</p><p>📞 ${esc(m.telefono || '—')} · ✉️ ${esc(m.email || '—')}</p><div class="cv">${esc(m.curriculum || 'Curriculum non inserito.')}</div>
+  <p class="muted" style="margin-top:10px">Il numero WhatsApp serve per ricevere le richieste: inseriscilo con il prefisso (es. 393331234567). Nome e cognome li modifica l'amministratore.</p>` : '<div class="empty">Profilo non trovato.</div>'}</div>`;
+}
+
+// ---------- DISPONIBILITÀ ----------
+async function vDisp() {
+  const mid = S.role === 'massaggiatore' ? S.profile.massaggiatore_id : (S.dispMid || (S.massaggiatori[0] && S.massaggiatori[0].id));
+  if (!mid) { $('view').innerHTML = '<div class="card empty">Nessun massaggiatore.</div>'; return; }
+  S.dispMid = mid;
+  const [d, a] = await Promise.all([
+    sb.from('disponibilita').select('*').eq('massaggiatore_id', mid).order('giorno').order('ora_inizio'),
+    sb.from('assenze').select('*').eq('massaggiatore_id', mid).order('data_da', { ascending:false })]);
+  const sel = S.role === 'admin' ? `<div class="fg"><label>Massaggiatore</label><select onchange="S.dispMid=this.value;vDisp()">${S.massaggiatori.map(m => `<option value="${m.id}" ${m.id === mid ? 'selected' : ''}>${esc(massName(m))}</option>`).join('')}</select></div>` : '';
+  const byDay = {}; (d.data || []).forEach(x => (byDay[x.giorno] = byDay[x.giorno] || []).push(x));
+  $('view').innerHTML = `<div class="card"><h2 style="margin-bottom:6px">Orari in cui sono disponibile</h2><p class="muted" style="margin-bottom:12px">Le strutture possono richiedere appuntamenti solo nelle fasce che inserisci qui. Valgono ogni settimana.</p>${sel}
+    <div class="tw"><table>${DAYS.map((n, i) => `<tr><th style="width:120px">${n}</th><td>${(byDay[i+1] || []).map(x =>
+      `<span class="pill st-confermato" style="margin-right:6px">${x.ora_inizio.slice(0,5)} – ${x.ora_fine.slice(0,5)} <a href="#" style="color:inherit;text-decoration:none" onclick="delDisp('${x.id}');return false">✕</a></span>`).join('') || '<span class="muted">non disponibile</span>'}</td></tr>`).join('')}</table></div>
+    <form onsubmit="addDisp(event)" style="margin-top:14px"><div class="chips fg">${DAYS.map((n, i) => `<label><input type="checkbox" name="gg" value="${i+1}"> ${n.slice(0,3)}</label>`).join('')}</div>
+      <div class="row" style="align-items:end"><div><label>Dalle</label><input type="time" id="dFrom" required value="09:00"></div><div><label>Alle</label><input type="time" id="dTo" required value="13:00"></div><button class="btn" style="flex:0 0 auto">Aggiungi fascia</button></div></form></div>
+  <div class="card"><h2 style="margin-bottom:10px">Assenze e ferie</h2>
+    ${(a.data || []).length ? `<div class="tw"><table>${a.data.map(x => `<tr><td>${fmtDay(x.data_da)} → ${fmtDay(x.data_a)}</td><td>${esc(x.motivo || '')}</td><td><button class="btn sm sec" onclick="delAss('${x.id}')">Elimina</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna assenza inserita.</p>'}
+    <form onsubmit="addAss(event)" style="margin-top:12px"><div class="row" style="align-items:end"><div><label>Dal</label><input type="date" id="aFrom" required></div><div><label>Al</label><input type="date" id="aTo" required></div><div><label>Motivo</label><input id="aWhy"></div><button class="btn" style="flex:0 0 auto">Aggiungi</button></div></form></div>`;
+}
+async function addDisp(e) {
+  e.preventDefault();
+  const gg = [...document.querySelectorAll('input[name=gg]:checked')].map(x => +x.value);
+  if (!gg.length) return toast('Seleziona almeno un giorno', true);
+  if ($('dTo').value <= $('dFrom').value) return toast('L\'ora di fine deve essere dopo l\'inizio', true);
+  const { error } = await sb.from('disponibilita').insert(gg.map(g => ({ massaggiatore_id: S.dispMid, giorno: g, ora_inizio: $('dFrom').value, ora_fine: $('dTo').value })));
+  if (error) return toast(error.message, true); vDisp();
+}
+async function delDisp(id) { await sb.from('disponibilita').delete().eq('id', id); vDisp(); }
+async function addAss(e) {
+  e.preventDefault();
+  const { error } = await sb.from('assenze').insert({ massaggiatore_id: S.dispMid, data_da: $('aFrom').value, data_a: $('aTo').value, motivo: $('aWhy').value.trim() || null });
+  if (error) return toast(error.message, true); vDisp();
+}
+async function delAss(id) { await sb.from('assenze').delete().eq('id', id); vDisp(); }
+
+// ---------- MAGAZZINO ----------
+function vMagazzino() {
+  const M = S.mag; if (S.role === 'struttura') M.str = S.profile.struttura_id;
+  if (!M.str && S.strutture[0]) M.str = S.strutture[0].id;
+  const arts = S.articoli.filter(a => a.struttura_id === M.str);
+  const canEdit = S.role !== 'struttura';
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Magazzino</h2>${canEdit ? '<button class="btn" onclick="editArt()">➕ Nuovo articolo</button>' : ''}</div>
+    ${S.role !== 'struttura' ? `<div class="fg"><label>Struttura</label><select onchange="S.mag.str=this.value;vMagazzino()">${S.strutture.map(s => `<option value="${s.id}" ${s.id === M.str ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
+    <div class="tw"><table><tr><th>Articolo</th><th>Quantità</th><th>Scorta minima</th><th>Ultimo aggiornamento</th><th></th></tr>${arts.map(a => {
+      const low = Number(a.soglia_minima) > 0 && Number(a.quantita) <= Number(a.soglia_minima);
+      return `<tr class="${low ? 'low' : ''}"><td><b>${esc(a.nome)}</b>${low ? ' <span class="pill st-richiesto">sotto scorta</span>' : ''}</td><td><b>${a.quantita}</b> ${esc(a.unita)}</td><td>${a.soglia_minima}</td>
+      <td class="muted">${esc(a.aggiornato_da || '')}<br>${fmtDT(a.aggiornato_il)}</td>
+      <td style="white-space:nowrap">${canEdit ? `<button class="btn sm sec" onclick="moveArt('${a.id}',-1)">−1</button> <button class="btn sm sec" onclick="moveArt('${a.id}',1)">+1</button> <button class="btn sm" onclick="moveDlg('${a.id}')">Carico/scarico</button> ` : ''}
+      <button class="btn sm sec" onclick="histArt('${a.id}')">Storico</button>${S.role === 'admin' ? ` <button class="btn sm sec" onclick="editArt('${a.id}')">Modifica</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">Nessun articolo in questo magazzino.</td></tr>'}</table></div></div>`;
+}
+async function moveArt(id, d) { await run(() => rpc('muovi_magazzino', { p_articolo: id, p_delta: d, p_nota: null })); await loadCore(); vMagazzino(); }
+function moveDlg(id) {
+  const a = S.articoli.find(x => x.id === id);
+  openModal(a.nome, `<form onsubmit="moveSave(event,'${id}')"><p class="muted">Quantità attuale: ${a.quantita} ${esc(a.unita)}</p>
+    <div class="row"><div><label>Operazione</label><select id="mvSign"><option value="1">Carico (+)</option><option value="-1">Scarico (−)</option></select></div><div><label>Quantità</label><input type="number" step="any" min="0" id="mvQty" required></div></div>
+    <div class="fg"><label>Nota</label><input id="mvNote" placeholder="es. usato per trattamento camera 12"></div>
+    <div class="actions"><button class="btn">Registra</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function moveSave(e, id) {
+  e.preventDefault();
+  const ok = await run(async () => { await rpc('muovi_magazzino', { p_articolo: id, p_delta: +$('mvSign').value * +$('mvQty').value, p_nota: $('mvNote').value }); return true; });
+  if (ok) { closeModal(); await loadCore(); vMagazzino(); }
+}
+async function histArt(id) {
+  const { data } = await sb.from('magazzino_movimenti').select('*').eq('articolo_id', id).order('il', { ascending:false }).limit(50);
+  openModal('Storico movimenti', (data || []).length ? `<div class="tw"><table><tr><th>Quando</th><th>Chi</th><th>Variazione</th><th>Giacenza</th><th>Nota</th></tr>${data.map(x =>
+    `<tr><td>${fmtDT(x.il)}</td><td>${esc(x.da_nome)}</td><td>${x.delta > 0 ? '+' : ''}${x.delta}</td><td>${x.quantita_dopo}</td><td>${esc(x.nota || '')}</td></tr>`).join('')}</table></div>` : '<div class="empty">Nessun movimento registrato.</div>');
+}
+function editArt(id) {
+  const a = id ? S.articoli.find(x => x.id === id) : { unita:'pz', quantita:0, soglia_minima:0 };
+  openModal(id ? 'Modifica articolo' : 'Nuovo articolo', `<form onsubmit="saveArt(event,'${id || ''}')"><div class="fg"><label>Nome *</label><input id="a_nome" required value="${esc(a.nome || '')}"></div>
+    <div class="row"><div><label>Unità</label><input id="a_unita" value="${esc(a.unita)}"></div><div><label>Scorta minima (avviso)</label><input type="number" step="any" min="0" id="a_soglia" value="${a.soglia_minima}"></div>
+    ${id ? '' : `<div><label>Quantità iniziale</label><input type="number" step="any" min="0" id="a_qty" value="0"></div>`}</div>
+    <div class="actions"><button class="btn">Salva</button>${id && S.role === 'admin' ? `<button type="button" class="btn danger" onclick="delArt('${id}')">Elimina</button>` : ''}<button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function saveArt(e, id) {
+  e.preventDefault();
+  const row = { nome: $('a_nome').value.trim(), unita: $('a_unita').value.trim() || 'pz', soglia_minima: +$('a_soglia').value || 0 };
+  if (id) { const { error } = await sb.from('magazzino_articoli').update(row).eq('id', id); if (error) return toast(error.message, true); }
+  else {
+    const { data, error } = await sb.from('magazzino_articoli').insert({ ...row, struttura_id: S.mag.str, quantita: 0, aggiornato_da: S.profile.nome }).select().single();
+    if (error) return toast(error.message, true);
+    const q = +$('a_qty').value || 0; if (q > 0) await run(() => rpc('muovi_magazzino', { p_articolo: data.id, p_delta: q, p_nota: 'carico iniziale' }));
+  }
+  closeModal(); await loadCore(); vMagazzino();
+}
+async function delArt(id) { if (!confirm('Eliminare l\'articolo e il suo storico?')) return; await sb.from('magazzino_articoli').delete().eq('id', id); closeModal(); await loadCore(); vMagazzino(); }
+
+// ---------- REPORT ----------
+function vReport() {
+  const R = S.rep = S.rep || { from: todayKey().slice(0, 8) + '01', to: todayKey(), str: '', mass: '', all: false };
+  const rows = S.appuntamenti.filter(a => {
+    const d = romeDay(a.inizio);
+    return d >= R.from && d <= R.to && (R.all || ['confermato','completato'].includes(a.stato)) && (!R.str || a.struttura_id === R.str) && (!R.mass || a.massaggiatore_id === R.mass);
+  });
+  const agg = (keyFn) => { const m = {}; rows.forEach(a => { const k = keyFn(a) || '—'; const o = m[k] = m[k] || { n:0, ore:0, euro:0 }; o.n++; o.ore += a.durata_min / 60; o.euro += Number(a.prezzo || 0); }); return Object.entries(m).sort((x, y) => x[0].localeCompare(y[0])); };
+  const perStr = agg(a => strById(a.struttura_id)?.nome), perMass = agg(a => a.massaggiatore_nome), perMese = agg(a => romeDay(a.inizio).slice(0, 7));
+  const tot = rows.reduce((t, a) => ({ n: t.n + 1, ore: t.ore + a.durata_min / 60, euro: t.euro + Number(a.prezzo || 0) }), { n:0, ore:0, euro:0 });
+  const showEuro = S.role === 'admin' || (S.role === 'struttura' && tot.euro > 0);
+  const tbl = (title, data, withBtn) => `<div class="card"><h3 style="margin-bottom:8px">${title}</h3><div class="tw"><table><tr><th></th><th>Appuntamenti</th><th>Ore</th>${showEuro ? '<th>Importo €</th>' : ''}</tr>${data.map(([k, o]) =>
+    `<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.ore.toFixed(1)}</td>${showEuro ? `<td>${o.euro.toFixed(2)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="4" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Report</h2><button class="btn" onclick="exportReport()">⬇ Scarica Excel</button></div>
+    <div class="row"><div><label>Dal</label><input type="date" value="${R.from}" onchange="S.rep.from=this.value;vReport()"></div><div><label>Al</label><input type="date" value="${R.to}" onchange="S.rep.to=this.value;vReport()"></div>
+    ${S.role !== 'struttura' ? `<div><label>Struttura</label><select onchange="S.rep.str=this.value;vReport()"><option value="">Tutte</option>${S.strutture.map(s => `<option value="${s.id}" ${R.str === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
+    ${S.role === 'admin' ? `<div><label>Massaggiatore</label><select onchange="S.rep.mass=this.value;vReport()"><option value="">Tutti</option>${S.massaggiatori.map(m => `<option value="${m.id}" ${R.mass === m.id ? 'selected' : ''}>${esc(massName(m))}</option>`).join('')}</select></div>` : ''}</div>
+    <label class="chips" style="text-transform:none;margin-top:8px"><input type="checkbox" ${R.all ? 'checked' : ''} onchange="S.rep.all=this.checked;vReport()"> includi anche richieste in attesa, annullate e rifiutate (di default solo confermati e completati)</label></div>
+    <div class="grid g4" style="margin-bottom:16px"><div class="kpi"><b>${tot.n}</b><span>Appuntamenti</span></div><div class="kpi"><b>${tot.ore.toFixed(1)}</b><span>Ore di massaggio</span></div>${showEuro ? `<div class="kpi"><b>€ ${tot.euro.toFixed(2)}</b><span>Importo (prezzi inseriti)</span></div>` : ''}</div>
+    ${S.role !== 'struttura' ? tbl('Per struttura', perStr) : ''}${S.role !== 'massaggiatore' ? tbl('Per massaggiatore', perMass) : ''}${tbl('Per mese', perMese)}`;
+  vReport.rows = { rows, perStr, perMass, perMese };
+}
+function exportReport() {
+  const { rows, perStr, perMass, perMese } = vReport.rows;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.sort((a, b) => a.inizio.localeCompare(b.inizio)).map(a => ({
+    Data: fmtDay(romeDay(a.inizio)), Ora: fmtTime(a.inizio), 'Durata (min)': a.durata_min, Struttura: strById(a.struttura_id)?.nome || '', Massaggiatore: a.massaggiatore_nome || '', Stato: STATI[a.stato], 'Prezzo': a.prezzo ?? '', Note: a.note || '' }))), 'Appuntamenti');
+  const sh = (d, n) => XLSX.utils.json_to_sheet(d.map(([k, o]) => ({ [n]: k, Appuntamenti: o.n, Ore: +o.ore.toFixed(2), Importo: +o.euro.toFixed(2) })));
+  XLSX.utils.book_append_sheet(wb, sh(perStr, 'Struttura'), 'Per struttura'); XLSX.utils.book_append_sheet(wb, sh(perMass, 'Massaggiatore'), 'Per massaggiatore'); XLSX.utils.book_append_sheet(wb, sh(perMese, 'Mese'), 'Per mese');
+  XLSX.writeFile(wb, `report_${S.rep.from}_${S.rep.to}.xlsx`);
+}
+
+// ---------- ACCESSI (admin) ----------
+async function vAccessi() {
+  const users = await rpc('elenco_utenti');
+  const link = u => u.ruolo === 'struttura' ? esc(strById(u.struttura_id)?.nome || '') : (u.ruolo === 'massaggiatore' ? esc(massName(massById(u.massaggiatore_id))) : '');
+  $('view').innerHTML = `<div class="card"><h2 style="margin-bottom:10px">Accessi</h2><div class="tw"><table><tr><th>Email</th><th>Ruolo</th><th>Collegato a</th><th>Ultimo accesso</th><th></th></tr>${users.map(u =>
+    `<tr><td>${esc(u.email)}</td><td>${{admin:'Amministratore',struttura:'Struttura',massaggiatore:'Massaggiatore'}[u.ruolo]}</td><td>${link(u)}</td><td class="muted">${u.ultimo_accesso ? fmtDT(u.ultimo_accesso) : 'mai'}</td>
+    <td style="white-space:nowrap"><button class="btn sm sec" onclick="resetPw('${u.user_id}')">Nuova password</button>${u.ruolo === 'admin' ? '' : ` <button class="btn sm danger" onclick="delUser('${u.user_id}')">Elimina</button>`}</td></tr>`).join('')}</table></div></div>
+  <div class="card"><h3 style="margin-bottom:10px">➕ Crea un nuovo accesso</h3><form onsubmit="createUser(event)">
+    <div class="row"><div><label>Tipo</label><select id="uRole" onchange="uFill()"><option value="struttura">Struttura</option><option value="massaggiatore">Massaggiatore</option></select></div>
+    <div><label>Collega a</label><select id="uLink"></select></div></div>
+    <div class="row" style="margin-top:10px"><div><label>Email di accesso</label><input type="email" id="uEmail" required></div><div><label>Password (min. 8 caratteri)</label><input type="text" id="uPass" required minlength="8" autocomplete="off"></div></div>
+    <div class="actions"><button class="btn">Crea accesso</button></div><p class="muted">Dopo aver creato l'accesso, comunica email e password alla persona. Prima aggiungi la struttura o il massaggiatore nelle rispettive sezioni.</p></form></div>`;
+  uFill();
+}
+function uFill() {
+  const r = $('uRole').value;
+  $('uLink').innerHTML = (r === 'struttura' ? S.strutture.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`) : S.massaggiatori.map(m => `<option value="${m.id}">${esc(massName(m))}</option>`)).join('');
+}
+async function createUser(e) {
+  e.preventDefault();
+  const r = $('uRole').value, id = $('uLink').value; if (!id) return toast('Seleziona a chi collegare l\'accesso', true);
+  const nome = r === 'struttura' ? strById(id).nome : massName(massById(id));
+  const ok = await run(async () => { await rpc('crea_utente', { p_email: $('uEmail').value, p_password: $('uPass').value, p_ruolo: r, p_nome: nome, p_struttura: r === 'struttura' ? id : null, p_massaggiatore: r === 'massaggiatore' ? id : null }); return true; });
+  if (ok) { toast('Accesso creato'); vAccessi(); }
+}
+async function resetPw(id) { const p = prompt('Nuova password (minimo 8 caratteri):'); if (!p) return; const ok = await run(async () => { await rpc('imposta_password', { p_user: id, p_password: p }); return true; }); if (ok) toast('Password cambiata'); }
+async function delUser(id) { if (!confirm('Eliminare questo accesso? La persona non potrà più entrare.')) return; const ok = await run(async () => { await rpc('elimina_utente', { p_user: id }); return true; }); if (ok) vAccessi(); }
+
+boot();
+</script>
+</body>
+</html>
