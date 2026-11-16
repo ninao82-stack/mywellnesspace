@@ -158,6 +158,7 @@ const digits = s => String(s || '').replace(/\D/g, '');
 const strById = id => S.strutture.find(s => s.id === id);
 const massById = id => S.massaggiatori.find(m => m.id === id);
 const servById = id => S.servizi.find(x => x.id === id);
+const priceFor = (strId, servId) => { const r = S.rel.ss.find(x => x.struttura_id === strId && x.servizio_id === servId); return r ? r.prezzo : null; };
 const euro = n => '€ ' + Number(n || 0).toFixed(2);
 const massName = m => m ? `${m.nome} ${m.cognome}` : '';
 const pill = st => `<span class="pill st-${st}">${STATI[st] || st}</span>`;
@@ -336,9 +337,10 @@ async function vPrenota() {
   $('view').innerHTML = `<div class="card"><div class="head"><h2>Richiedi un appuntamento</h2><button class="btn sec sm" onclick="go('home')">← Home</button></div>
     <p class="muted">Servono almeno 3 ore di preavviso${S.role === 'admin' ? ' (l\'amministratore può derogare)' : ''}. L'appuntamento si conferma quando un massaggiatore accetta.</p>
     <div class="row" style="margin:12px 0">${strSel}
-      <div><label>Servizio</label><select onchange="S.prenota.serv=this.value;vPrenota()"><option value="">— scegli —</option>${servs.map(x => `<option value="${x.id}" ${P.serv === x.id ? 'selected' : ''}>${esc(x.nome)} · ${x.durata_min} min · ${euro(x.prezzo)}</option>`).join('')}</select></div>
+      <div><label>Servizio</label><select onchange="S.prenota.serv=this.value;vPrenota()"><option value="">— scegli —</option>${servs.map(x => `<option value="${x.id}" ${P.serv === x.id ? 'selected' : ''}>${esc(x.nome)} · ${x.durata_min} min · ${euro(priceFor(P.str, x.id))}</option>`).join('')}</select></div>
       <div><label>Giorno</label><input type="date" min="${todayKey()}" value="${P.giorno}" onchange="S.prenota.giorno=this.value;vPrenota()"></div></div>
     ${sv && sv.descrizione ? `<p class="muted">${esc(sv.descrizione)}</p>` : ''}
+    ${P.str && P.serv && P.giorno ? `<div class="row" style="align-items:end;margin-bottom:12px"><div><label>Oppure scrivi tu l'orario</label><input type="time" id="tSel" step="300"></div><button class="btn" style="flex:0 0 auto" onclick="askTime()">Richiedi questo orario</button></div>` : ''}
     <div id="slots"><div class="empty">Caricamento orari...</div></div></div>`;
   if (!P.str) { $('slots').innerHTML = '<div class="empty">Scegli la struttura.</div>'; return; }
   if (!servs.length) { $('slots').innerHTML = `<div class="empty">Nessun servizio abilitato per questa struttura.${S.role === 'admin' ? ' Abilitali dalla scheda della struttura (sezione Strutture).' : ' Contatta l\'amministratore.'}</div>`; return; }
@@ -355,9 +357,30 @@ async function vPrenota() {
       return `<button class="slot" ${ok ? '' : 'disabled title="Servono almeno 3 ore di preavviso"'} onclick="askSlot('${r.inizio}',${r.liberi})"><b>${fmtTime(r.inizio)}</b><small>${r.liberi} disponibil${r.liberi === 1 ? 'e' : 'i'}${ok ? '' : '<br>preavviso &lt; 3h'}</small></button>`;
     }).join('')}</div>`;
 }
+function romeToISO(day, time) {
+  const [y, m, d] = day.split('-').map(Number), [h, mi] = time.split(':').map(Number), want = Date.UTC(y, m - 1, d, h, mi);
+  let t = want;
+  for (let i = 0; i < 2; i++) {
+    const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date(t)).reduce((o, x) => (o[x.type] = x.value, o), {});
+    t += want - Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+  }
+  return new Date(t).toISOString();
+}
+async function askTime() {
+  const P = S.prenota, v = $('tSel').value;
+  if (!v) return toast('Scrivi l\'orario (es. 10:20)', true);
+  const inizio = romeToISO(P.giorno, v), t = new Date(inizio);
+  if (t < new Date()) return toast('Quell\'orario è già passato', true);
+  if (S.role !== 'admin' && t < new Date(Date.now() + 3 * 3600 * 1000)) return toast('Servono almeno 3 ore di preavviso', true);
+  const n = await run(() => rpc('conta_liberi', { p_struttura: P.str, p_inizio: inizio, p_servizio: P.serv }));
+  if (n === undefined) return;
+  if (!n) return toast('Nessun massaggiatore disponibile alle ' + v + ' per questo servizio. Prova un altro orario.', true);
+  askSlot(inizio, n);
+}
 function askSlot(inizio, n) {
   const P = S.prenota, st = strById(P.str), sv = servById(P.serv);
-  openModal('Conferma la richiesta', `<p><b>${esc(st ? st.nome : '')}</b><br>${esc(sv.nome)} · ${sv.durata_min} minuti${S.role !== 'massaggiatore' ? ' · ' + euro(sv.prezzo) : ''}<br>${fmtDT(inizio)}<br><span class="muted">${n} massaggiator${n === 1 ? 'e verrà avvisato' : 'i verranno avvisati'}: l'appuntamento si conferma quando il primo accetta.</span></p>
+  openModal('Conferma la richiesta', `<p><b>${esc(st ? st.nome : '')}</b><br>${esc(sv.nome)} · ${sv.durata_min} minuti${' · ' + euro(priceFor(P.str, sv.id))}<br>${fmtDT(inizio)}<br><span class="muted">${n} massaggiator${n === 1 ? 'e verrà avvisato' : 'i verranno avvisati'}: l'appuntamento si conferma quando il primo accetta.</span></p>
     <form onsubmit="sendRequest(event,'${inizio}')"><div class="fg"><label>Note per il massaggiatore (camera, preferenze...)</label><textarea id="rqNote" rows="3"></textarea></div>
     <div class="actions"><button class="btn" id="rqBtn">Invia richiesta</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
 }
@@ -476,23 +499,43 @@ async function setRel(table, keyCol, keyVal, otherCol, ids) {
   let r = await sb.from(table).delete().eq(keyCol, keyVal); if (r.error) throw r.error;
   if (ids.length) { r = await sb.from(table).insert(ids.map(i => ({ [keyCol]: keyVal, [otherCol]: i }))); if (r.error) throw r.error; }
 }
-const servItems = () => S.servizi.map(x => ({ id: x.id, label: `${x.nome} (${x.durata_min} min, ${euro(x.prezzo)})${x.attivo ? '' : ' - non attivo'}` }));
+const servItems = () => S.servizi.map(x => ({ id: x.id, label: `${x.nome} (${x.durata_min} min)${x.attivo ? '' : ' - non attivo'}` }));
 const massItems = () => S.massaggiatori.map(m => ({ id: m.id, label: massName(m) + (m.attivo ? '' : ' - non attivo') }));
 const strItems = () => S.strutture.map(s => ({ id: s.id, label: s.nome + (s.attiva ? '' : ' - non attiva') }));
 const sectionH = t => `<h4 style="margin:14px 0 6px;color:var(--primary)">${t}</h4>`;
+
+// ---------- ELIMINAZIONE (admin) ----------
+async function delEntity(kind, id) {
+  const C = { str: { t: 'strutture', lab: 'la struttura', eo: 'a', col: 'struttura_id', act: 'attiva', nome: () => (strById(id) || {}).nome },
+              mas: { t: 'massaggiatori', lab: 'il massaggiatore', eo: 'o', col: 'massaggiatore_id', act: 'attivo', nome: () => massName(massById(id) || {}) },
+              srv: { t: 'servizi', lab: 'il servizio', eo: 'o', act: 'attivo', nome: () => (servById(id) || {}).nome } }[kind];
+  const nome = C.nome(), n = C.col ? S.appuntamenti.filter(a => a[C.col] === id).length : 0;
+  if (n > 0) {
+    if (!confirm(`${nome} ha ${n} appuntament${n === 1 ? 'o' : 'i'} nello storico, quindi non può essere cancellat${C.eo} (si perderebbero i report).\n\nVuoi disattivarl${C.eo}? Resta nello storico ma non compare più nelle scelte e non riceve né fa più richieste.`)) return;
+    const ok = await run(async () => { const { error } = await sb.from(C.t).update({ [C.act]: false }).eq('id', id); if (error) throw error; return true; });
+    if (ok) { closeModal(); toast('Disattivat' + C.eo); await refresh(); }
+    return;
+  }
+  if (!confirm(`Eliminare definitivamente ${C.lab} "${nome}"?${kind === 'srv' ? '\nGli appuntamenti già fatti restano nello storico.' : '\nVerranno eliminati anche i suoi accessi.'}`)) return;
+  const ok = await run(async () => {
+    if (C.col) { let us = []; try { us = (await rpc('elenco_utenti')).filter(u => u[C.col] === id); } catch (e) {}
+      for (const u of us) await rpc('elimina_utente', { p_user: u.user_id }); }
+    const { error } = await sb.from(C.t).delete().eq('id', id); if (error) throw error; return true; });
+  if (ok) { closeModal(); toast('Eliminat' + C.eo); await refresh(); }
+}
 
 // ---------- STRUTTURE (admin) ----------
 function vStrutture() {
   $('view').innerHTML = `<div class="card"><div class="head"><h2>Strutture</h2><button class="btn" onclick="editStruttura()">➕ Nuova struttura</button></div>
   <p class="muted" style="margin-bottom:8px">Clicca una struttura per vedere la scheda completa.</p>
-  <div class="tw"><table><tr><th>Nome</th><th>Indirizzo</th><th>Servizi</th><th>Massaggiatori</th><th>Stato</th></tr>${S.strutture.map(s =>
+  <div class="tw"><table><tr><th>Nome</th><th>Indirizzo</th><th>Servizi</th><th>Massaggiatori</th><th>Stato</th><th></th></tr>${S.strutture.map(s =>
     `<tr onclick="showStruttura('${s.id}')" style="cursor:pointer"><td><b>${esc(s.nome)}</b></td><td>${esc([s.indirizzo, s.citta].filter(Boolean).join(', '))}</td>
      <td>${S.rel.ss.filter(r => r.struttura_id === s.id).length}</td><td>${S.rel.sm.filter(r => r.struttura_id === s.id).length}</td>
-     <td>${s.attiva ? 'Attiva' : '<span class="muted">Non attiva</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nessuna struttura. Aggiungi la prima.</td></tr>'}</table></div></div>`;
+     <td>${s.attiva ? 'Attiva' : '<span class="muted">Non attiva</span>'}</td><td><button class="btn sm danger" onclick="event.stopPropagation();delEntity('str','${s.id}')" title="Elimina">🗑</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nessuna struttura. Aggiungi la prima.</td></tr>'}</table></div></div>`;
 }
 async function showStruttura(id) {
   const s = strById(id); if (!s) return;
-  const serv = S.rel.ss.filter(r => r.struttura_id === id).map(r => servById(r.servizio_id)).filter(Boolean);
+  const serv = S.rel.ss.filter(r => r.struttura_id === id).map(r => ({ ...servById(r.servizio_id), prezzo: r.prezzo })).filter(x => x.nome);
   const mass = S.rel.sm.filter(r => r.struttura_id === id).map(r => massById(r.massaggiatore_id)).filter(Boolean);
   const ap = S.appuntamenti.filter(a => a.struttura_id === id);
   const fatti = ap.filter(a => ['confermato','completato'].includes(a.stato) && new Date(a.inizio) < new Date());
@@ -514,7 +557,14 @@ async function showStruttura(id) {
     <div class="actions"><button class="btn" onclick="editStruttura('${id}')">Modifica</button>
       <button class="btn sec" onclick="closeModal();S.cal.fStr='${id}';go('calendario')">Calendario</button>
       <button class="btn sec" onclick="closeModal();S.mag.str='${id}';go('magazzino')">Magazzino</button>
-      <button class="btn sec" onclick="closeModal();S.rep=null;vReport.pre={str:'${id}'};go('report')">Report</button></div>`);
+      <button class="btn sec" onclick="closeModal();S.rep=null;vReport.pre={str:'${id}'};go('report')">Report</button>
+      <button class="btn danger" onclick="delEntity('str','${id}')">🗑 Elimina</button></div>`);
+}
+function servPriceList(sid, selS) {
+  const pr = id => { const r = sid ? S.rel.ss.find(x => x.struttura_id === sid && x.servizio_id === id) : null; return r ? r.prezzo : ''; };
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;max-height:240px;overflow:auto">
+    ${S.servizi.length ? S.servizi.map(x => `<div class="row" style="align-items:center;margin:4px 0;gap:8px"><label class="chips" style="display:flex;text-transform:none;flex:1"><input type="checkbox" name="ckServ" value="${x.id}" ${selS.has(x.id) ? 'checked' : ''}> ${esc(x.nome)} <span class="muted">(${x.durata_min} min)${x.attivo ? '' : ' - non attivo'}</span></label>
+      <input type="number" min="0" step="0.01" placeholder="€" id="sp_${x.id}" value="${pr(x.id)}" style="width:100px;flex:0 0 100px"></div>`).join('') : '<span class="muted">Nessun servizio: aggiungilo prima nella sezione Servizi.</span>'}</div>`;
 }
 function editStruttura(id) {
   const s = id ? strById(id) : { attiva: true };
@@ -524,7 +574,7 @@ function editStruttura(id) {
   openModal(id ? 'Modifica struttura' : 'Nuova struttura', `<form onsubmit="saveStruttura(event,'${id || ''}')">${f('nome','Nome *')}${f('indirizzo','Indirizzo')}${f('citta','Città')}${f('referente','Referente')}${f('telefono','Telefono','tel')}${f('email','Email (riceve le conferme)','email')}
     <div class="fg"><label>Note</label><textarea id="s_note" rows="2">${esc(s.note || '')}</textarea></div>
     <label class="chips" style="text-transform:none"><input type="checkbox" id="s_attiva" ${s.attiva ? 'checked' : ''}> Struttura attiva (può richiedere appuntamenti)</label>
-    <div class="fg" style="margin-top:12px"><label>Servizi offerti a questa struttura</label>${checkList('ckServ', servItems(), selS)}</div>
+    <div class="fg" style="margin-top:12px"><label>Servizi offerti e prezzo per questa struttura (€)</label>${servPriceList(id, selS)}</div>
     <div class="fg"><label>Massaggiatori disponibili per questa struttura</label>${checkList('ckMass', massItems(), selM)}</div>
     <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
 }
@@ -533,11 +583,14 @@ async function saveStruttura(e, id) {
   const row = { nome: $('s_nome').value.trim(), indirizzo: $('s_indirizzo').value.trim() || null, citta: $('s_citta').value.trim() || null, referente: $('s_referente').value.trim() || null,
     telefono: $('s_telefono').value.trim() || null, email: $('s_email').value.trim() || null, note: $('s_note').value.trim() || null, attiva: $('s_attiva').checked };
   const servIds = ckVals('ckServ'), massIds = ckVals('ckMass');
+  const noPrice = servIds.find(v => $('sp_' + v).value === '' || +$('sp_' + v).value < 0);
+  if (noPrice) return toast('Inserisci il prezzo per ogni servizio spuntato (anche 0)', true);
   await run(async () => {
     let sid = id;
     if (id) { const { error } = await sb.from('strutture').update(row).eq('id', id); if (error) throw error; }
     else { const { data, error } = await sb.from('strutture').insert(row).select().single(); if (error) throw error; sid = data.id; }
-    await setRel('struttura_servizi', 'struttura_id', sid, 'servizio_id', servIds);
+    let r = await sb.from('struttura_servizi').delete().eq('struttura_id', sid); if (r.error) throw r.error;
+    if (servIds.length) { r = await sb.from('struttura_servizi').insert(servIds.map(v => ({ struttura_id: sid, servizio_id: v, prezzo: +$('sp_' + v).value }))); if (r.error) throw r.error; }
     await setRel('struttura_massaggiatori', 'struttura_id', sid, 'massaggiatore_id', massIds);
     closeModal(); toast('Salvato'); await refresh();
     if (!id) showStruttura(sid);
@@ -551,7 +604,8 @@ function vMassaggiatori() {
   <div class="grid g2">${S.massaggiatori.map(m => `<div class="card" onclick="showMass('${m.id}')" style="margin:0;cursor:pointer;${m.attivo ? '' : 'opacity:.6'}"><h3>${esc(massName(m))} ${m.attivo ? '' : '<span class="muted">(non attivo)</span>'}</h3>
     <p class="muted" style="margin:6px 0">${esc(m.specializzazioni || '')}${m.anni_esperienza ? ` · ${m.anni_esperienza} anni di esperienza` : ''}</p>
     <p>📞 ${esc(m.telefono || '—')}<br>✉️ ${esc(m.email || '—')}</p>
-    <p class="muted">${S.rel.ms.filter(r => r.massaggiatore_id === m.id).length} servizi · ${S.rel.sm.filter(r => r.massaggiatore_id === m.id).length} strutture</p></div>`).join('') || '<div class="empty">Nessun massaggiatore.</div>'}</div></div>`;
+    <p class="muted">${S.rel.ms.filter(r => r.massaggiatore_id === m.id).length} servizi · ${S.rel.sm.filter(r => r.massaggiatore_id === m.id).length} strutture</p>
+    <div style="text-align:right"><button class="btn sm danger" onclick="event.stopPropagation();delEntity('mas','${m.id}')" title="Elimina">🗑 Elimina</button></div></div>`).join('') || '<div class="empty">Nessun massaggiatore.</div>'}</div></div>`;
 }
 async function showMass(id) {
   const m = massById(id); if (!m) return;
@@ -579,7 +633,8 @@ async function showMass(id) {
     <div class="actions"><button class="btn" onclick="editMass('${id}')">Modifica</button>
       <button class="btn sec" onclick="closeModal();S.dispMid='${id}';go('disponibilita')">Disponibilità</button>
       <button class="btn sec" onclick="closeModal();S.cal.fMass='${id}';go('calendario')">Calendario</button>
-      <button class="btn sec" onclick="closeModal();S.rep=null;vReport.pre={mass:'${id}'};go('report')">Report</button></div>`);
+      <button class="btn sec" onclick="closeModal();S.rep=null;vReport.pre={mass:'${id}'};go('report')">Report</button>
+      <button class="btn danger" onclick="delEntity('mas','${id}')">🗑 Elimina</button></div>`);
 }
 function editMass(id) {
   const adm = S.role === 'admin';
@@ -634,27 +689,26 @@ function vServizi() {
   if (S.role === 'struttura') list = list.filter(x => x.attivo && S.rel.ss.some(r => r.struttura_id === S.profile.struttura_id && r.servizio_id === x.id));
   if (S.role === 'massaggiatore') list = list.filter(x => x.attivo);
   const mine = id => S.rel.ms.some(r => r.servizio_id === id && r.massaggiatore_id === S.profile.massaggiatore_id);
-  const price = S.role !== 'massaggiatore';
+  const price = S.role === 'struttura';
   $('view').innerHTML = `<div class="card"><div class="head"><h2>Servizi</h2>${adm ? '<button class="btn" onclick="editServizio()">➕ Nuovo servizio</button>' : ''}</div>
-  <div class="tw"><table><tr><th>Servizio</th><th>Descrizione</th><th>Durata</th>${price ? '<th>Prezzo</th>' : ''}${S.role === 'massaggiatore' ? '<th>Lo eseguo</th>' : ''}${adm ? '<th>Collegati</th><th>Stato</th><th></th>' : ''}</tr>${list.map(x =>
-    `<tr style="${x.attivo ? '' : 'opacity:.55'}"><td><b>${esc(x.nome)}</b></td><td class="muted">${esc(x.descrizione || '')}</td><td>${x.durata_min} min</td>${price ? `<td>${euro(x.prezzo)}</td>` : ''}${S.role === 'massaggiatore' ? `<td>${mine(x.id) ? '✔' : ''}</td>` : ''}
-    ${adm ? `<td class="muted">${S.rel.ms.filter(r => r.servizio_id === x.id).length} massaggiatori<br>${S.rel.ss.filter(r => r.servizio_id === x.id).length} strutture</td><td>${x.attivo ? 'Attivo' : 'Non attivo'}</td><td><button class="btn sm sec" onclick="editServizio('${x.id}')">Modifica</button></td>` : ''}</tr>`).join('')
+  ${adm ? '<p class="muted" style="margin-bottom:8px">Il prezzo si imposta per ogni struttura: Strutture → Modifica.</p>' : ''}<div class="tw"><table><tr><th>Servizio</th><th>Descrizione</th><th>Durata</th>${price ? '<th>Prezzo</th>' : ''}${S.role === 'massaggiatore' ? '<th>Lo eseguo</th>' : ''}${adm ? '<th>Collegati</th><th>Stato</th><th></th>' : ''}</tr>${list.map(x =>
+    `<tr style="${x.attivo ? '' : 'opacity:.55'}"><td><b>${esc(x.nome)}</b></td><td class="muted">${esc(x.descrizione || '')}</td><td>${x.durata_min} min</td>${price ? `<td>${euro(priceFor(S.profile.struttura_id, x.id))}</td>` : ''}${S.role === 'massaggiatore' ? `<td>${mine(x.id) ? '✔' : ''}</td>` : ''}
+    ${adm ? `<td class="muted">${S.rel.ms.filter(r => r.servizio_id === x.id).length} massaggiatori<br>${S.rel.ss.filter(r => r.servizio_id === x.id).length} strutture</td><td>${x.attivo ? 'Attivo' : 'Non attivo'}</td><td style="white-space:nowrap"><button class="btn sm sec" onclick="editServizio('${x.id}')">Modifica</button> <button class="btn sm danger" onclick="delEntity('srv','${x.id}')" title="Elimina">🗑</button></td>` : ''}</tr>`).join('')
     || `<tr><td colspan="7" class="empty">${adm ? 'Nessun servizio. Aggiungi il primo.' : 'Nessun servizio disponibile.'}</td></tr>`}</table></div></div>`;
 }
 function editServizio(id) {
-  const x = id ? servById(id) : { attivo: true, durata_min: 60, prezzo: 0 };
+  const x = id ? servById(id) : { attivo: true, durata_min: 60 };
   openModal(id ? 'Modifica servizio' : 'Nuovo servizio', `<form onsubmit="saveServizio(event,'${id || ''}')">
     <div class="fg"><label>Tipo di servizio *</label><input id="v_nome" required value="${esc(x.nome || '')}" placeholder="es. Massaggio decontratturante"></div>
     <div class="fg"><label>Descrizione</label><textarea id="v_desc" rows="3">${esc(x.descrizione || '')}</textarea></div>
-    <div class="row"><div><label>Durata (minuti, 30-240)</label><input type="number" id="v_dur" min="30" max="240" step="5" required value="${x.durata_min}"></div>
-    <div><label>Prezzo (€)</label><input type="number" id="v_prezzo" min="0" step="0.01" required value="${x.prezzo}"></div></div>
+    <div class="fg"><label>Durata (minuti, 30-240)</label><input type="number" id="v_dur" min="30" max="240" step="5" required value="${x.durata_min}"></div>
     <label class="chips" style="text-transform:none"><input type="checkbox" id="v_attivo" ${x.attivo ? 'checked' : ''}> Servizio attivo (prenotabile)</label>
-    <p class="muted" style="margin-top:8px">Dopo averlo creato, abilitalo alle strutture e ai massaggiatori dalle rispettive schede (Modifica).</p>
+    <p class="muted" style="margin-top:8px">Dopo averlo creato, abilitalo alle strutture (con il loro prezzo) e ai massaggiatori dalle rispettive schede (Modifica).</p>
     <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
 }
 async function saveServizio(e, id) {
   e.preventDefault();
-  const row = { nome: $('v_nome').value.trim(), descrizione: $('v_desc').value.trim() || null, durata_min: +$('v_dur').value, prezzo: +$('v_prezzo').value, attivo: $('v_attivo').checked };
+  const row = { nome: $('v_nome').value.trim(), descrizione: $('v_desc').value.trim() || null, durata_min: +$('v_dur').value, attivo: $('v_attivo').checked };
   const { error } = id ? await sb.from('servizi').update(row).eq('id', id) : await sb.from('servizi').insert(row);
   if (error) return toast(error.message, true);
   closeModal(); toast('Salvato'); await refresh();
@@ -665,19 +719,14 @@ async function vDisp() {
   const mid = S.role === 'massaggiatore' ? S.profile.massaggiatore_id : (S.dispMid || (S.massaggiatori[0] && S.massaggiatori[0].id));
   if (!mid) { $('view').innerHTML = '<div class="card empty">Nessun massaggiatore.</div>'; return; }
   S.dispMid = mid;
-  const [d, a] = await Promise.all([
-    sb.from('disponibilita').select('*').eq('massaggiatore_id', mid).order('giorno').order('ora_inizio'),
-    sb.from('assenze').select('*').eq('massaggiatore_id', mid).order('data_da', { ascending:false })]);
+  const d = await sb.from('disponibilita').select('*').eq('massaggiatore_id', mid).order('giorno').order('ora_inizio');
   const sel = S.role === 'admin' ? `<div class="fg"><label>Massaggiatore</label><select onchange="S.dispMid=this.value;vDisp()">${S.massaggiatori.map(m => `<option value="${m.id}" ${m.id === mid ? 'selected' : ''}>${esc(massName(m))}</option>`).join('')}</select></div>` : '';
   const byDay = {}; (d.data || []).forEach(x => (byDay[x.giorno] = byDay[x.giorno] || []).push(x));
   $('view').innerHTML = `<div class="card"><h2 style="margin-bottom:6px">Orari in cui sono disponibile</h2><p class="muted" style="margin-bottom:12px">Le strutture possono richiedere appuntamenti solo nelle fasce che inserisci qui. Valgono ogni settimana.</p>${sel}
     <div class="tw"><table>${DAYS.map((n, i) => `<tr><th style="width:120px">${n}</th><td>${(byDay[i+1] || []).map(x =>
       `<span class="pill st-confermato" style="margin-right:6px">${x.ora_inizio.slice(0,5)} – ${x.ora_fine.slice(0,5)} <a href="#" style="color:inherit;text-decoration:none" onclick="delDisp('${x.id}');return false">✕</a></span>`).join('') || '<span class="muted">non disponibile</span>'}</td></tr>`).join('')}</table></div>
     <form onsubmit="addDisp(event)" style="margin-top:14px"><div class="chips fg">${DAYS.map((n, i) => `<label><input type="checkbox" name="gg" value="${i+1}"> ${n.slice(0,3)}</label>`).join('')}</div>
-      <div class="row" style="align-items:end"><div><label>Dalle</label><input type="time" id="dFrom" required value="09:00"></div><div><label>Alle</label><input type="time" id="dTo" required value="13:00"></div><button class="btn" style="flex:0 0 auto">Aggiungi fascia</button></div></form></div>
-  <div class="card"><h2 style="margin-bottom:10px">Assenze e ferie</h2>
-    ${(a.data || []).length ? `<div class="tw"><table>${a.data.map(x => `<tr><td>${fmtDay(x.data_da)} → ${fmtDay(x.data_a)}</td><td>${esc(x.motivo || '')}</td><td><button class="btn sm sec" onclick="delAss('${x.id}')">Elimina</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna assenza inserita.</p>'}
-    <form onsubmit="addAss(event)" style="margin-top:12px"><div class="row" style="align-items:end"><div><label>Dal</label><input type="date" id="aFrom" required></div><div><label>Al</label><input type="date" id="aTo" required></div><div><label>Motivo</label><input id="aWhy"></div><button class="btn" style="flex:0 0 auto">Aggiungi</button></div></form></div>`;
+      <div class="row" style="align-items:end"><div><label>Dalle</label><input type="time" id="dFrom" required value="09:00"></div><div><label>Alle</label><input type="time" id="dTo" required value="13:00"></div><button class="btn" style="flex:0 0 auto">Aggiungi fascia</button></div></form></div>`;
 }
 async function addDisp(e) {
   e.preventDefault();
@@ -688,12 +737,6 @@ async function addDisp(e) {
   if (error) return toast(error.message, true); vDisp();
 }
 async function delDisp(id) { await sb.from('disponibilita').delete().eq('id', id); vDisp(); }
-async function addAss(e) {
-  e.preventDefault();
-  const { error } = await sb.from('assenze').insert({ massaggiatore_id: S.dispMid, data_da: $('aFrom').value, data_a: $('aTo').value, motivo: $('aWhy').value.trim() || null });
-  if (error) return toast(error.message, true); vDisp();
-}
-async function delAss(id) { await sb.from('assenze').delete().eq('id', id); vDisp(); }
 
 // ---------- MAGAZZINO ----------
 function vMagazzino() {
