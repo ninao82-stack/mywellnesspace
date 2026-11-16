@@ -186,7 +186,7 @@ function notifText(r) {
 
 // ---------- accesso ----------
 async function boot() {
-  if (SUPABASE_URL.includes('INSERISCI') || SUPABASE_ANON_KEY.includes('INSERISCI')) { $('setup').style.display = 'block'; return; }
+  if (SUPABASE_URL.includes('https://rwvinkzdgwgazegnfadc.supabase.co/') || SUPABASE_ANON_KEY.includes('sb_publishable_U-Z7TWwbr0nUnjZfDjq_Yg_cyYVlRJG')) { $('setup').style.display = 'block'; return; }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') showLogin(); });
   const { data } = await sb.auth.getSession();
