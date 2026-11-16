@@ -87,7 +87,7 @@ th{font-size:12px;text-transform:uppercase;color:var(--muted)}
 
 <div id="setup" class="wrap" style="display:none">
   <div class="card"><h2>Configurazione mancante</h2>
-  <p>Apri il file e inserisci in alto <b>SUPABASE_URL</b> e <b>SUPABASE_ANON_KEY</b> del tuo progetto Supabase (Project Settings &gt; API).</p></div>
+  <p>Manca il file <b>config.js</b> (o contiene ancora i valori di esempio). Caricalo nella stessa cartella di questa pagina con l'indirizzo e la chiave del tuo progetto Supabase.</p></div>
 </div>
 
 <div id="loginBox" class="wrap" style="display:none">
@@ -119,11 +119,14 @@ th{font-size:12px;text-transform:uppercase;color:var(--muted)}
 </div></div>
 <div class="toast" id="toast"></div>
 
+<script src="config.js"></script>
 <script>
 // ====================== CONFIGURAZIONE ======================
-const SUPABASE_URL = 'INSERISCI_URL_SUPABASE';
-const SUPABASE_ANON_KEY = 'INSERISCI_CHIAVE_ANON';
-const NOTIFICHE_URL = '';   // indirizzo dello script Apps Script per WhatsApp/email (vedi guida). Vuoto = nessun invio
+// I valori si scrivono nel file config.js (non qui): così aggiornare questa pagina non li cancella.
+const CFG = window.AGENDA_CONFIG || {};
+const SUPABASE_URL = String(CFG.supabaseUrl || 'INSERISCI_URL_SUPABASE').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+const SUPABASE_ANON_KEY = String(CFG.supabaseKey || 'INSERISCI_CHIAVE_ANON').trim();
+const NOTIFICHE_URL = String(CFG.notificheUrl || '').trim();   // indirizzo dello script Apps Script per WhatsApp/email (vedi guida). Vuoto = nessun invio
 // ============================================================
 const TZ = 'Europe/Rome';
 const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
@@ -186,11 +189,15 @@ function notifText(r) {
 
 // ---------- accesso ----------
 async function boot() {
-  if (SUPABASE_URL.includes('https://rwvinkzdgwgazegnfadc.supabase.co/') || SUPABASE_ANON_KEY.includes('sb_publishable_U-Z7TWwbr0nUnjZfDjq_Yg_cyYVlRJG')) { $('setup').style.display = 'block'; return; }
-  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') showLogin(); });
-  const { data } = await sb.auth.getSession();
-  if (data.session) await startSession(data.session); else showLogin();
+  if (SUPABASE_URL.includes('INSERISCI') || SUPABASE_ANON_KEY.includes('INSERISCI') || SUPABASE_ANON_KEY.includes('INCOLLA')) { $('setup').style.display = 'block'; return; }
+  try {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') showLogin(); });
+    const { data } = await sb.auth.getSession();
+    if (data.session) await startSession(data.session); else showLogin();
+  } catch (e) {
+    showLogin(); $('lMsg').textContent = 'Errore di collegamento: ' + (e.message || e);
+  }
 }
 function showLogin() { $('app').style.display = 'none'; $('loginBox').style.display = 'block'; }
 async function doLogin(e) {
