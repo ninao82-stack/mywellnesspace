@@ -81,6 +81,15 @@ th{font-size:12px;text-transform:uppercase;color:var(--muted)}
 .chips label{display:inline-flex;align-items:center;gap:5px;text-transform:none;font-size:14px;color:var(--text);margin-right:12px;font-weight:500}
 .chips input{width:auto}
 @media(max-width:700px){.cal .day{min-height:70px}.ev{font-size:10px}}
+
+.kpi.big b{font-size:24px;display:block}.kpi.big span{font-size:13px}
+.tabs,.chipbar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.tabs button,.chipbar button{background:#fff;border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-weight:600;color:#374151}
+.tabs button.on,.chipbar button.on{background:#134e4a;color:#fff;border-color:#134e4a}
+.chipbar{margin:8px 0 12px}.chipbar button{padding:5px 12px;font-size:13px}
+.bars .brow{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:10px;align-items:center;margin:7px 0;font-size:14px}
+.bars .bt{background:#f1f5f9;border-radius:999px;height:14px;overflow:hidden}.bars .bt i{display:block;height:100%;border-radius:999px}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
 @media(max-width:700px){
  .wrap{padding:12px}
  .topbar .wrap{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;padding-top:8px;padding-bottom:8px}
@@ -108,7 +117,7 @@ th{font-size:12px;text-transform:uppercase;color:var(--muted)}
     <p class="muted">Accedi con le credenziali che ti sono state date.</p>
     <form onsubmit="doLogin(event)">
       <div class="fg"><label>Email</label><input type="email" id="lEmail" required autocomplete="username"></div>
-      <div class="fg"><label>Password</label><input type="password" id="lPass" required autocomplete="current-password"></div>
+      <div class="fg"><label>Password</label><input type="password" id="lPass" required autocomplete="current-password"><label class="chips" style="text-transform:none;margin-top:6px"><input type="checkbox" style="width:auto" onchange="$('lPass').type=this.checked?'text':'password'"> Mostra password</label></div>
       <div id="lMsg" style="color:var(--danger);min-height:18px;font-size:13px"></div>
       <button class="btn" style="width:100%;margin-top:8px">Accedi</button>
     </form>
@@ -144,13 +153,13 @@ const TZ = 'Europe/Rome';
 const DAYS = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const STATI = { richiesto:'In attesa', confermato:'Confermato', completato:'Completato', annullato:'Annullato', rifiutato:'Rifiutato' };
 const NAV = {
-  admin: [['home','Home'],['accessi','Accessi'],['calendario','Calendario'],['magazzino','Magazzino'],['servizi','Servizi'],['massaggiatori','Massaggiatori'],['strutture','Strutture'],['report','Report']],
-  struttura: [['home','Home'],['calendario','Calendario'],['magazzino','Magazzino'],['servizi','Servizi'],['report','Report']],
-  massaggiatore: [['home','Home'],['calendario','Calendario'],['disponibilita','Disponibilità'],['magazzino','Magazzino'],['report','Report'],['profilo','Il mio profilo']]
+  admin: [['home','Home'],['accessi','Accessi'],['calendario','Calendario'],['magazzino','Magazzino'],['servizi','Servizi'],['massaggiatori','Massaggiatori'],['strutture','Strutture'],['report','Statistiche']],
+  struttura: [['home','Home'],['calendario','Calendario'],['magazzino','Magazzino'],['servizi','Servizi'],['report','Statistiche'],['profilo','Il mio profilo']],
+  massaggiatore: [['home','Home'],['calendario','Calendario'],['disponibilita','Disponibilità'],['magazzino','Magazzino'],['report','Statistiche'],['profilo','Il mio profilo']]
 };
 
 let sb = null;
-const S = { user:null, profile:null, role:null, strutture:[], massaggiatori:[], appuntamenti:[], richieste:[], articoli:[], servizi:[], rel:{ ss:[], sm:[], ms:[] },
+const S = { user:null, profile:null, role:null, strutture:[], massaggiatori:[], appuntamenti:[], richieste:[], articoli:[], servizi:[], compensi:[], gu:[], rel:{ ss:[], sm:[], ms:[] },
             page:'', cal:{ y:0, m:0, view:'cal', showOff:false, fStr:'', fMass:'', fStato:'' }, prenota:{ str:'', giorno:'', serv:'' }, mag:{ str:'' }, dispMid:'', rep:null };
 
 // ---------- utilità ----------
@@ -171,12 +180,15 @@ const strById = id => S.strutture.find(s => s.id === id);
 const massById = id => S.massaggiatori.find(m => m.id === id);
 const servById = id => S.servizi.find(x => x.id === id);
 function timeBox(id, v) {
-  const [h, m] = (v || '').split(':'), pad = n => String(n).padStart(2, '0');
-  const hs = Array.from({ length: 24 }, (_, i) => `<option value="${pad(i)}" ${h === pad(i) ? 'selected' : ''}>${pad(i)}</option>`).join('');
-  const ms = Array.from({ length: 12 }, (_, i) => `<option value="${pad(i * 5)}" ${m === pad(i * 5) ? 'selected' : ''}>${pad(i * 5)}</option>`).join('');
-  return `<span id="${id}" style="display:flex;gap:6px;align-items:center"><select id="${id}_h"><option value="">ora</option>${hs}</select><b>:</b><select id="${id}_m">${ms}</select></span>`;
+  const [h, m] = (v || '09:00').split(':'), pad2 = n => String(n).padStart(2, '0');
+  const hs = Array.from({ length: 24 }, (_, i) => `<option value="${pad2(i)}" ${h === pad2(i) ? 'selected' : ''}>${pad2(i)}</option>`).join('');
+  const ms = [0, 15, 30, 45].map(i => `<option value="${pad2(i)}" ${m === pad2(i) ? 'selected' : ''}>${pad2(i)}</option>`).join('');
+  return `<span id="${id}" style="display:flex;gap:6px;align-items:center"><select id="${id}_h">${hs}</select><b>:</b><select id="${id}_m">${ms}</select></span>`;
 }
-function readTime(id) { const h = $(id + '_h').value; return h ? h + ':' + $(id + '_m').value : null; }
+function readTime(id) { return $(id + '_h').value + ':' + $(id + '_m').value; }
+const compFor = (tipo, id) => S.compensi.find(c => c.tipo === tipo && c.ref_id === id) || null;
+const tierPct = n => n <= 15 ? 10 : n <= 30 ? 15 : 20;
+const compLabel = c => !c ? 'Non impostata' : c.modo === 'progressiva' ? 'Progressiva: 10% (1°–15° massaggio del mese) · 15% (16°–30°) · 20% (dal 31°)' : Number(c.perc) + '%';
 const priceFor = (strId, servId) => { const r = S.rel.ss.find(x => x.struttura_id === strId && x.servizio_id === servId); return r ? r.prezzo : null; };
 const euro = n => '€ ' + Number(n || 0).toFixed(2);
 const massName = m => m ? `${m.nome} ${m.cognome}` : '';
@@ -243,7 +255,7 @@ async function startSession(session) {
 }
 
 async function loadCore() {
-  const [st, ms, ap, rq, ar, sv, ss, sm, mss] = await Promise.all([
+  const [st, ms, ap, rq, ar, sv, ss, sm, mss, cp] = await Promise.all([
     sb.from('strutture').select('*').order('nome'),
     sb.from('massaggiatori').select('*').order('cognome'),
     sb.from('appuntamenti').select('*').order('inizio', { ascending:false }).limit(5000),
@@ -252,10 +264,11 @@ async function loadCore() {
     sb.from('servizi').select('*').order('nome'),
     sb.from('struttura_servizi').select('*'),
     sb.from('struttura_massaggiatori').select('*'),
-    sb.from('massaggiatore_servizi').select('*')
+    sb.from('massaggiatore_servizi').select('*'),
+    sb.from('compensi').select('*')
   ]);
   S.strutture = st.data || []; S.massaggiatori = ms.data || []; S.appuntamenti = ap.data || []; S.richieste = rq.data || []; S.articoli = ar.data || [];
-  S.servizi = sv.data || []; S.rel = { ss: ss.data || [], sm: sm.data || [], ms: mss.data || [] };
+  S.compensi = cp.data || []; S.servizi = sv.data || []; S.rel = { ss: ss.data || [], sm: sm.data || [], ms: mss.data || [] };
   renderNav();
 }
 const myPending = () => S.appuntamenti.filter(a => a.stato === 'richiesto' && new Date(a.inizio) > new Date() &&
@@ -286,10 +299,15 @@ const doneThisMonth = () => S.appuntamenti.filter(a => ['confermato','completato
 const kpi = (n, l) => `<div class="kpi"><b>${n}</b><span>${l}</span></div>`;
 const bookBtn = () => `<button class="btn" onclick="S.prenota.serv='';go('prenota')">➕ Richiedi un appuntamento</button>`;
 
+function todoDone() {
+  const list = S.appuntamenti.filter(a => a.stato === 'confermato' && new Date(a.inizio).getTime() + a.durata_min * 60000 < Date.now()).sort(byInizio);
+  if (!list.length) return '';
+  return `<div class="card" style="border-color:#99f6e4;background:#f0fdfa"><h3 style="margin-bottom:4px">Da segnare come fatti (${list.length})</h3><p class="muted" style="margin-bottom:8px">Questi massaggi sono terminati: conferma che sono stati eseguiti.</p>
+    ${list.map(a => `<div class="row" style="align-items:center;padding:6px 0;border-top:1px solid #ccfbf1"><div><b>${fmtDT(a.inizio)}</b> · ${esc(apLabel(a))}<div class="sub">${esc(a.servizio_nome || '')} · ${a.durata_min} min</div></div><button class="btn ok sm" style="flex:0 0 auto" onclick="completeAppt('${a.id}')">✔ Fatto</button></div>`).join('')}</div>`;
+}
 function vHome() {
-  if (S.role === 'admin') return homeAdmin();
-  if (S.role === 'struttura') return homeStruttura();
-  return homeMassaggiatore();
+  if (S.role === 'admin') homeAdmin(); else if (S.role === 'struttura') homeStruttura(); else homeMassaggiatore();
+  $('view').insertAdjacentHTML('beforeend', todoDone());
 }
 function homeAdmin() {
   const now = new Date(), tk = todayKey();
@@ -447,8 +465,10 @@ function vCalendario() {
     body = `<div class="cal">${cells}</div>`;
   } else {
     const rows = (C.view === 'list' ? all.filter(a => romeDay(a.inizio).startsWith(mk)) : all).sort((a,b) => a.inizio.localeCompare(b.inizio));
-    body = rows.length ? `<div class="tw"><table><tr><th>Quando</th><th>Durata</th>${S.role !== 'struttura' ? '<th>Struttura</th>' : ''}<th>Massaggiatore</th><th>Stato</th></tr>${rows.map(a =>
-      `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}</td><td>${a.durata_min} min</td>${S.role !== 'struttura' ? `<td>${esc(strById(a.struttura_id)?.nome)}</td>` : ''}<td>${esc(a.massaggiatore_nome || '—')}</td><td>${pill(a.stato)}</td></tr>`).join('')}</table></div>` : '<div class="empty">Nessun appuntamento.</div>';
+    body = rows.length ? `<div class="tw"><table><tr><th>Quando</th><th>Durata</th>${S.role !== 'struttura' ? '<th>Struttura</th>' : ''}<th>Massaggiatore</th><th>Esito</th>${S.role === 'admin' ? '<th></th>' : ''}</tr>${rows.map(a =>
+      `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}</td><td>${a.durata_min} min</td>${S.role !== 'struttura' ? `<td>${esc(strById(a.struttura_id)?.nome)}</td>` : ''}<td>${esc(a.massaggiatore_nome || '—')}</td><td>${esitoCell(a)}</td>${S.role === 'admin' ? `<td><button class="btn sm danger" title="Elimina" onclick="event.stopPropagation();delAppt('${a.id}')">🗑</button></td>` : ''}</tr>`).join('')}</table></div>` : '<div class="empty">Nessun appuntamento.</div>';
+    vCalendario.rows = rows;
+    if (S.role === 'admin' && rows.length) body = `<div style="margin-bottom:8px"><button class="btn danger sm" onclick="delAllShown()">🗑 Elimina tutti i ${rows.length} appuntamenti mostrati</button></div>` + body;
   }
   $('view').innerHTML = `<div class="card"><div class="head"><h2>Calendario</h2>
     ${C.view !== 'all' ? `<div class="row" style="flex:0 0 auto;align-items:center"><button class="btn sec sm" onclick="calMove(-1)">←</button><b style="min-width:150px;text-align:center;text-transform:capitalize">${mn}</b><button class="btn sec sm" onclick="calMove(1)">→</button></div>` : ''}</div>
@@ -467,11 +487,12 @@ function openAppt(id) {
   const m = massById(a.massaggiatore_id);
   let act = '';
   if (S.role === 'massaggiatore' && a.stato === 'richiesto' && mine && !ended) act += `<button class="btn ok" onclick="confirmAppt('${id}')">✔ Confermo</button><button class="btn sec" onclick="rejectAppt('${id}')">Non posso</button>`;
-  if (['admin','massaggiatore'].includes(S.role) && a.stato === 'confermato' && ended && (S.role === 'admin' || a.massaggiatore_id === S.profile.massaggiatore_id)) act += `<button class="btn" onclick="completeAppt('${id}')">Segna come completato</button>`;
+  if (a.stato === 'confermato' && ended && (S.role === 'admin' || (S.role === 'massaggiatore' && a.massaggiatore_id === S.profile.massaggiatore_id) || (S.role === 'struttura' && a.struttura_id === S.profile.struttura_id))) act += `<button class="btn ok" onclick="completeAppt('${id}')">✔ Fatto</button>`;
+  if (S.role === 'admin') act += `<button class="btn danger" onclick="delAppt('${id}')">🗑 Elimina definitivamente</button>`;
   if (['admin','struttura'].includes(S.role) && ['richiesto','confermato'].includes(a.stato) && !ended) act += `<button class="btn danger" onclick="cancelAppt('${id}')">Annulla appuntamento</button>`;
   if (S.role === 'admin' && a.stato === 'richiesto' && !ended) act += `<button class="btn sec" onclick="resend('${id}')">Rinvia messaggi</button>`;
   openModal('Appuntamento', `<table><tr><th>Quando</th><td>${fmtDT(a.inizio)} (${a.durata_min} min)</td></tr>
-    <tr><th>Stato</th><td>${pill(a.stato)}</td></tr>
+    <tr><th>Esito</th><td>${esitoCell(a)}</td></tr>
     <tr><th>Servizio</th><td>${esc(a.servizio_nome || '—')}</td></tr>
     <tr><th>Struttura</th><td>${esc(st.nome)}${S.role !== 'struttura' && (st.indirizzo || st.citta) ? '<br><span class="muted">' + esc([st.indirizzo, st.citta].filter(Boolean).join(', ')) + '</span>' : ''}${S.role !== 'struttura' && st.telefono ? `<br>📞 <a href="tel:${esc(st.telefono)}">${esc(st.telefono)}</a>` : ''}</td></tr>
     <tr><th>Massaggiatore</th><td>${esc(a.massaggiatore_nome || '— non ancora assegnato')}${S.role === 'admin' && m && m.telefono ? ` · <a target="_blank" rel="noopener" href="https://wa.me/${digits(m.telefono)}">WhatsApp</a>` : ''}</td></tr>
@@ -486,7 +507,19 @@ async function cancelAppt(id) {
   if (ok) { notifica({ action:'annullo', appuntamento_id:id }); toast('Appuntamento annullato'); }
   closeModal(); await refresh();
 }
-async function completeAppt(id) { await run(() => rpc('completa_appuntamento', { p_app: id })); closeModal(); await refresh(); }
+async function completeAppt(id) { const ok = await run(async () => { await rpc('completa_appuntamento', { p_app: id }); return true; }); if (ok) toast('Segnato come fatto'); closeModal(); await refresh(); }
+async function delAppt(id) {
+  if (!confirm('Eliminare DEFINITIVAMENTE questo appuntamento? Sparirà anche dallo storico e dalle statistiche.')) return;
+  const ok = await run(async () => { const { error } = await sb.from('appuntamenti').delete().eq('id', id); if (error) throw error; return true; });
+  if (ok) { toast('Appuntamento eliminato'); closeModal(); await refresh(); }
+}
+async function delAllShown() {
+  const ids = (vCalendario.rows || []).map(a => a.id); if (!ids.length) return;
+  const t = prompt(`Stai per eliminare DEFINITIVAMENTE ${ids.length} appuntamenti (quelli attualmente mostrati, filtri compresi). Non si può annullare.\n\nScrivi ELIMINA per confermare:`);
+  if (t !== 'ELIMINA') return toast('Nessun appuntamento eliminato');
+  const ok = await run(async () => { for (let i = 0; i < ids.length; i += 100) { const { error } = await sb.from('appuntamenti').delete().in('id', ids.slice(i, i + 100)); if (error) throw error; } return true; });
+  if (ok) { toast(ids.length + ' appuntamenti eliminati'); await refresh(); }
+}
 async function savePrice(id) {
   const v = $('apPrezzo').value;
   const { error } = await sb.from('appuntamenti').update({ prezzo: v === '' ? null : Number(v) }).eq('id', id);
@@ -527,7 +560,9 @@ async function delEntity(kind, id) {
   const ok = await run(async () => {
     if (C.col) { let us = []; try { us = (await rpc('elenco_utenti')).filter(u => u[C.col] === id); } catch (e) {}
       for (const u of us) await rpc('elimina_utente', { p_user: u.user_id }); }
-    const { error } = await sb.from(C.t).delete().eq('id', id); if (error) throw error; return true; });
+    const { error } = await sb.from(C.t).delete().eq('id', id); if (error) throw error;
+    if (C.col) await sb.from('compensi').delete().eq('ref_id', id);
+    return true; });
   if (ok) { closeModal(); toast('Eliminat' + C.eo); await refresh(); }
 }
 
@@ -555,6 +590,7 @@ async function showStruttura(id) {
     <tr><th>Referente</th><td>${esc(s.referente || '—')}</td></tr>
     <tr><th>Telefono</th><td>${s.telefono ? `<a href="tel:${esc(s.telefono)}">${esc(s.telefono)}</a>` : '—'}</td></tr>
     <tr><th>Email</th><td>${esc(s.email || '—')}</td></tr>
+    <tr><th>Guadagno struttura</th><td>${esc(compLabel(compFor('struttura', id)))}</td></tr>
     <tr><th>Accessi</th><td>${logins.length ? logins.map(esc).join('<br>') : '<span class="muted">nessun accesso creato</span>'}</td></tr>
     ${s.note ? `<tr><th>Note</th><td>${esc(s.note)}</td></tr>` : ''}</table>
     ${sectionH('Servizi offerti')}${serv.length ? `<div class="tw"><table>${serv.map(x => `<tr><td>${esc(x.nome)}</td><td>${x.durata_min} min</td><td>${euro(x.prezzo)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessun servizio abilitato: la struttura non può ancora prenotare.</p>'}
@@ -583,6 +619,9 @@ function editStruttura(id) {
     <label class="chips" style="text-transform:none"><input type="checkbox" id="s_attiva" ${s.attiva ? 'checked' : ''}> Struttura attiva (può richiedere appuntamenti)</label>
     <div class="fg" style="margin-top:12px"><label>Servizi offerti e prezzo per questa struttura (€)</label>${servPriceList(id, selS)}</div>
     <div class="fg"><label>Massaggiatori disponibili per questa struttura</label>${checkList('ckMass', massItems(), selM)}</div>
+    ${(() => { const c = id ? compFor('struttura', id) : null, prog = c && c.modo === 'progressiva'; return `<div class="fg"><label>Guadagno della struttura sui massaggi fatti</label>
+      <label class="chips" style="display:flex;text-transform:none;align-items:center;gap:8px"><input type="radio" name="cmodo" value="fissa" ${prog ? '' : 'checked'}> Percentuale fissa <input type="number" id="c_perc" min="0" max="100" step="0.5" value="${c ? Number(c.perc) : 0}" style="width:90px"> %</label>
+      <label class="chips" style="display:flex;text-transform:none;align-items:center;gap:8px"><input type="radio" name="cmodo" value="progressiva" ${prog ? 'checked' : ''}> Progressiva automatica (10% dal 1° al 15° massaggio del mese · 15% dal 16° al 30° · 20% dal 31° in poi)</label></div>`; })()}
     <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
 }
 async function saveStruttura(e, id) {
@@ -596,6 +635,7 @@ async function saveStruttura(e, id) {
     let sid = id;
     if (id) { const { error } = await sb.from('strutture').update(row).eq('id', id); if (error) throw error; }
     else { const { data, error } = await sb.from('strutture').insert(row).select().single(); if (error) throw error; sid = data.id; }
+    { const { error } = await sb.from('compensi').upsert({ tipo: 'struttura', ref_id: sid, modo: document.querySelector('input[name=cmodo]:checked').value, perc: +$('c_perc').value || 0 }, { onConflict: 'tipo,ref_id' }); if (error) throw error; }
     let r = await sb.from('struttura_servizi').delete().eq('struttura_id', sid); if (r.error) throw r.error;
     if (servIds.length) { r = await sb.from('struttura_servizi').insert(servIds.map(v => ({ struttura_id: sid, servizio_id: v, prezzo: +$('sp_' + v).value }))); if (r.error) throw r.error; }
     await setRel('struttura_massaggiatori', 'struttura_id', sid, 'massaggiatore_id', massIds);
@@ -628,6 +668,7 @@ async function showMass(id) {
   openModal(massName(m), `${m.attivo ? '' : '<p><span class="pill st-rifiutato">Non attivo</span></p>'}
     <table><tr><th>WhatsApp</th><td>${m.telefono ? `<a target="_blank" rel="noopener" href="https://wa.me/${digits(m.telefono)}">${esc(m.telefono)}</a>` : '—'}</td></tr>
     <tr><th>Email</th><td>${esc(m.email || '—')}</td></tr>
+    <tr><th>% di guadagno</th><td>${compFor('massaggiatore', id) ? Number(compFor('massaggiatore', id).perc) + '%' : '<span class="muted">non impostata</span>'}</td></tr>
     <tr><th>Accesso</th><td>${login ? esc(login) : '<span class="muted">nessun accesso creato</span>'}</td></tr>
     <tr><th>Esperienza</th><td>${m.anni_esperienza ? m.anni_esperienza + ' anni' : '—'}</td></tr></table>
     ${sectionH('Curriculum')}<div class="cv">${esc(m.curriculum || 'Curriculum non inserito.')}</div>
@@ -653,7 +694,8 @@ function editMass(id) {
     <div class="row">${f('telefono','WhatsApp (con prefisso, es. 393331234567)','tel')}${f('email','Email','email')}</div>
     ${f('anni_esperienza','Anni di esperienza','number')}
     <div class="fg"><label>Curriculum</label><textarea id="m_curriculum" rows="8">${esc(m.curriculum || '')}</textarea></div>
-    ${adm ? `<label class="chips" style="text-transform:none"><input type="checkbox" id="m_attivo" ${m.attivo ? 'checked' : ''}> Attivo (riceve richieste)</label>
+    ${adm ? `<div class="fg"><label>% di guadagno del massaggiatore (sul prezzo del massaggio)</label><input type="number" id="m_perc" min="0" max="100" step="0.5" value="${(id && compFor('massaggiatore', id)) ? Number(compFor('massaggiatore', id).perc) : 0}" style="max-width:140px"></div>
+    <label class="chips" style="text-transform:none"><input type="checkbox" id="m_attivo" ${m.attivo ? 'checked' : ''}> Attivo (riceve richieste)</label>
     <div class="fg" style="margin-top:12px"><label>Servizi che esegue</label>${checkList('ckServ', servItems(), selS)}</div>
     <div class="fg"><label>Strutture in cui lavora</label>${checkList('ckStr', strItems(), selT)}</div>` : ''}
     <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
@@ -670,6 +712,7 @@ async function saveMass(e, id) {
     if (id) { const { error } = await sb.from('massaggiatori').update(row).eq('id', id); if (error) throw error; }
     else { const { data, error } = await sb.from('massaggiatori').insert(row).select().single(); if (error) throw error; mid = data.id; }
     if (adm) {
+      { const { error } = await sb.from('compensi').upsert({ tipo: 'massaggiatore', ref_id: mid, modo: 'fissa', perc: +$('m_perc').value || 0 }, { onConflict: 'tipo,ref_id' }); if (error) throw error; }
       await setRel('massaggiatore_servizi', 'massaggiatore_id', mid, 'servizio_id', servIds);
       await setRel('struttura_massaggiatori', 'massaggiatore_id', mid, 'struttura_id', strIds);
     }
@@ -677,7 +720,34 @@ async function saveMass(e, id) {
     if (adm && !id) showMass(mid);
   });
 }
-function vProfilo() {
+async function vProfilo() { return S.role === 'struttura' ? vProfiloStr() : vProfiloMass(); }
+async function vProfiloStr() {
+  const st = strById(S.profile.struttura_id); if (!st) { $('view').innerHTML = '<div class="card empty">Profilo non trovato.</div>'; return; }
+  const c = compFor('struttura', st.id), mk = todayKey().slice(0, 7);
+  const gu = await rpc('guadagni').catch(() => []), n = gu.filter(g => romeDay(g.inizio).startsWith(mk)).length;
+  const serv = S.rel.ss.filter(r => r.struttura_id === st.id).map(r => ({ ...servById(r.servizio_id), prezzo: r.prezzo })).filter(x => x.nome);
+  const tiers = [['1° – 15° massaggio del mese', 10, 1, 15], ['16° – 30° massaggio del mese', 15, 16, 30], ['dal 31° in poi', 20, 31, 999]];
+  $('view').innerHTML = `<div class="card"><div class="head"><h2>Il mio profilo</h2><button class="btn" onclick="editProfiloStr()">Modifica</button></div>
+    <h3>${esc(st.nome)}</h3><p class="muted">${esc([st.indirizzo, st.citta].filter(Boolean).join(', '))}</p>
+    <table><tr><th>Referente</th><td>${esc(st.referente || '—')}</td></tr><tr><th>Telefono</th><td>${esc(st.telefono || '—')}</td></tr><tr><th>Email (riceve le conferme)</th><td>${esc(st.email || '—')}</td></tr></table>
+    ${sectionH('Servizi e prezzi')}${serv.length ? `<div class="tw"><table>${serv.map(x => `<tr><td>${esc(x.nome)}</td><td>${x.durata_min} min</td><td>${euro(x.prezzo)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessun servizio abilitato: contatta l\'amministratore.</p>'}
+    ${sectionH('Il mio guadagno')}${!c ? '<p class="muted">Percentuale non ancora impostata.</p>' : c.modo === 'progressiva' ? `<p>Hai una percentuale <b>progressiva</b> che sale con i massaggi fatti nel mese:</p>
+      <div class="tw"><table>${tiers.map(t => `<tr style="${(n + 1) >= t[2] && (n + 1) <= t[3] ? 'background:#f0fdfa;font-weight:700' : ''}"><td>${t[0]}</td><td>${t[1]}%</td></tr>`).join('')}</table></div>
+      <p style="margin-top:8px">Questo mese hai <b>${n}</b> massaggi fatti: il prossimo sarà il ${n + 1}° e varrà <b>${tierPct(n + 1)}%</b>.</p>` : `<p>La tua percentuale di guadagno su ogni massaggio fatto: <b style="font-size:20px">${Number(c.perc)}%</b></p>`}
+    <p class="muted" style="margin-top:10px">Nome e indirizzo li modifica l'amministratore. Puoi aggiornare referente, telefono ed email.</p></div>`;
+}
+function editProfiloStr() {
+  const st = strById(S.profile.struttura_id);
+  openModal('Modifica profilo', `<form onsubmit="saveProfiloStr(event)"><div class="fg"><label>Referente</label><input id="p_ref" value="${esc(st.referente || '')}"></div>
+    <div class="fg"><label>Telefono</label><input id="p_tel" type="tel" value="${esc(st.telefono || '')}"></div><div class="fg"><label>Email (riceve le conferme)</label><input id="p_mail" type="email" value="${esc(st.email || '')}"></div>
+    <div class="actions"><button class="btn">Salva</button><button type="button" class="btn sec" onclick="closeModal()">Annulla</button></div></form>`);
+}
+async function saveProfiloStr(e) {
+  e.preventDefault();
+  const ok = await run(async () => { await rpc('aggiorna_profilo_struttura', { p_telefono: $('p_tel').value, p_email: $('p_mail').value, p_referente: $('p_ref').value }); return true; });
+  if (ok) { closeModal(); toast('Salvato'); await refresh(); }
+}
+function vProfiloMass() {
   const m = massById(S.profile.massaggiatore_id);
   const serv = S.rel.ms.filter(r => r.massaggiatore_id === (m && m.id)).map(r => servById(r.servizio_id)).filter(Boolean);
   const strs = S.rel.sm.filter(r => r.massaggiatore_id === (m && m.id)).map(r => strById(r.struttura_id)).filter(Boolean);
@@ -685,6 +755,7 @@ function vProfilo() {
   ${m ? `<h3>${esc(massName(m))}</h3><p class="muted">${m.anni_esperienza ? `${m.anni_esperienza} anni di esperienza` : ''}</p><p>📞 ${esc(m.telefono || '—')} · ✉️ ${esc(m.email || '—')}</p><div class="cv">${esc(m.curriculum || 'Curriculum non inserito.')}</div>
   ${sectionH('Servizi che eseguo')}${serv.length ? serv.map(x => `<span class="pill st-completato" style="margin:0 6px 6px 0">${esc(x.nome)}</span>`).join('') : '<p class="muted">Nessuno: contatta l\'amministratore.</p>'}
   ${sectionH('Strutture in cui lavoro')}${strs.length ? strs.map(x => `<span class="pill st-confermato" style="margin:0 6px 6px 0">${esc(x.nome)}</span>`).join('') : '<p class="muted">Nessuna: contatta l\'amministratore.</p>'}
+  ${sectionH('Il mio guadagno')}<p>La tua percentuale di guadagno su ogni massaggio fatto: <b style="font-size:20px">${compFor('massaggiatore', m.id) ? Number(compFor('massaggiatore', m.id).perc) + '%' : 'non ancora impostata'}</b></p>
   <p class="muted" style="margin-top:10px">Il numero WhatsApp serve per ricevere le richieste: inseriscilo con il prefisso (es. 393331234567). Nome, cognome, servizi e strutture li modifica l'amministratore.</p>` : '<div class="empty">Profilo non trovato.</div>'}</div>`;
 }
 
@@ -759,7 +830,7 @@ function vMagazzino() {
       return `<tr class="${low ? 'low' : ''}"><td><b>${esc(a.nome)}</b>${low ? ' <span class="pill st-richiesto">sotto scorta</span>' : ''}</td><td><b>${a.quantita}</b> ${esc(a.unita)}</td><td>${a.soglia_minima}</td>
       <td class="muted">${esc(a.aggiornato_da || '')}<br>${fmtDT(a.aggiornato_il)}</td>
       <td style="white-space:nowrap">${canEdit ? `<button class="btn sm sec" onclick="moveArt('${a.id}',-1)">−1</button> ${adm ? `<button class="btn sm sec" onclick="moveArt('${a.id}',1)">+1</button>` : ''} <button class="btn sm" onclick="moveDlg('${a.id}')">${adm ? 'Carico/scarico' : 'Scarico'}</button> ` : ''}
-      <button class="btn sm sec" onclick="histArt('${a.id}')">Storico</button>${S.role === 'admin' ? ` <button class="btn sm sec" onclick="editArt('${a.id}')">Modifica</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">Nessun articolo in questo magazzino.</td></tr>'}</table></div></div>`;
+      <button class="btn sm sec" onclick="histArt('${a.id}')">Storico</button>${S.role === 'admin' ? ` <button class="btn sm sec" onclick="editArt('${a.id}')">Modifica</button> <button class="btn sm danger" title="Elimina" onclick="delArt('${a.id}')">🗑</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">Nessun articolo in questo magazzino.</td></tr>'}</table></div></div>`;
 }
 async function moveArt(id, d) { await run(() => rpc('muovi_magazzino', { p_articolo: id, p_delta: d, p_nota: null })); await loadCore(); vMagazzino(); }
 function moveDlg(id) {
@@ -776,8 +847,9 @@ async function moveSave(e, id) {
 }
 async function histArt(id) {
   const { data } = await sb.from('magazzino_movimenti').select('*').eq('articolo_id', id).order('il', { ascending:false }).limit(50);
-  openModal('Storico movimenti', (data || []).length ? `<div class="tw"><table><tr><th>Quando</th><th>Chi</th><th>Variazione</th><th>Giacenza</th><th>Nota</th></tr>${data.map(x =>
-    `<tr><td>${fmtDT(x.il)}</td><td>${esc(x.da_nome)}</td><td>${x.delta > 0 ? '+' : ''}${x.delta}</td><td>${x.quantita_dopo}</td><td>${esc(x.nota || '')}</td></tr>`).join('')}</table></div>` : '<div class="empty">Nessun movimento registrato.</div>');
+  const adm = S.role === 'admin';
+  openModal('Storico movimenti', (data || []).length ? `${adm ? '<p class="muted" style="margin-bottom:6px">Cancellando una voce dallo storico la giacenza attuale non cambia.</p>' : ''}<div class="tw"><table><tr><th>Quando</th><th>Chi</th><th>Variazione</th><th>Giacenza</th><th>Nota</th>${adm ? '<th></th>' : ''}</tr>${data.map(x =>
+    `<tr><td>${fmtDT(x.il)}</td><td>${esc(x.da_nome)}</td><td>${x.delta > 0 ? '+' : ''}${x.delta}</td><td>${x.quantita_dopo}</td><td>${esc(x.nota || '')}</td>${adm ? `<td><button class="btn sm danger" onclick="delMov('${x.id}','${id}')">🗑</button></td>` : ''}</tr>`).join('')}</table></div>` : '<div class="empty">Nessun movimento registrato.</div>');
 }
 function editArt(id) {
   const a = id ? S.articoli.find(x => x.id === id) : { unita:'pz', quantita:0, soglia_minima:0 };
@@ -797,38 +869,140 @@ async function saveArt(e, id) {
   }
   closeModal(); await loadCore(); vMagazzino();
 }
+async function delMov(mid, aid) {
+  if (!confirm('Eliminare questa voce dallo storico? (La giacenza attuale non cambia.)')) return;
+  const { error } = await sb.from('magazzino_movimenti').delete().eq('id', mid); if (error) return toast(error.message, true);
+  histArt(aid);
+}
 async function delArt(id) { if (!confirm('Eliminare l\'articolo e il suo storico?')) return; await sb.from('magazzino_articoli').delete().eq('id', id); closeModal(); await loadCore(); vMagazzino(); }
 
-// ---------- REPORT ----------
-function vReport() {
-  const R = S.rep = S.rep || Object.assign({ from: todayKey().slice(0, 8) + '01', to: todayKey(), str: '', mass: '', all: false }, vReport.pre || {}); vReport.pre = null;
-  const rows = S.appuntamenti.filter(a => {
-    const d = romeDay(a.inizio);
-    return d >= R.from && d <= R.to && (R.all || ['confermato','completato'].includes(a.stato)) && (!R.str || a.struttura_id === R.str) && (!R.mass || a.massaggiatore_id === R.mass);
-  });
-  const agg = (keyFn) => { const m = {}; rows.forEach(a => { const k = keyFn(a) || '—'; const o = m[k] = m[k] || { n:0, ore:0, euro:0 }; o.n++; o.ore += a.durata_min / 60; o.euro += Number(a.prezzo || 0); }); return Object.entries(m).sort((x, y) => x[0].localeCompare(y[0])); };
-  const perStr = agg(a => strById(a.struttura_id)?.nome), perMass = agg(a => a.massaggiatore_nome), perMese = agg(a => romeDay(a.inizio).slice(0, 7)), perServ = agg(a => a.servizio_nome);
-  const tot = rows.reduce((t, a) => ({ n: t.n + 1, ore: t.ore + a.durata_min / 60, euro: t.euro + Number(a.prezzo || 0) }), { n:0, ore:0, euro:0 });
-  const showEuro = S.role === 'admin' || (S.role === 'struttura' && tot.euro > 0);
-  const tbl = (title, data, withBtn) => `<div class="card"><h3 style="margin-bottom:8px">${title}</h3><div class="tw"><table><tr><th></th><th>Appuntamenti</th><th>Ore</th>${showEuro ? '<th>Importo €</th>' : ''}</tr>${data.map(([k, o]) =>
-    `<tr><td>${esc(k)}</td><td>${o.n}</td><td>${o.ore.toFixed(1)}</td>${showEuro ? `<td>${o.euro.toFixed(2)}</td>` : ''}</tr>`).join('') || '<tr><td colspan="4" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
-  $('view').innerHTML = `<div class="card"><div class="head"><h2>Report</h2><button class="btn" onclick="exportReport()">⬇ Scarica Excel</button></div>
+// ---------- STATISTICHE ----------
+const eur = n => '€ ' + Number(n || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const monthName = k => { const [y, m] = k.split('-'); return new Date(Date.UTC(+y, +m - 1, 1)).toLocaleDateString('it-IT', { month: 'short', year: 'numeric', timeZone: 'UTC' }); };
+function hbars(items) {
+  const mx = Math.max(1, ...items.map(i => i[1]));
+  return `<div class="bars">${items.map(([l, v, c, sub]) => `<div class="brow"><span class="bl">${esc(l)}</span><span class="bt"><i style="width:${Math.max(v ? 2 : 0, v / mx * 100)}%;background:${c || 'var(--primary)'}"></i></span><b>${sub ?? v}</b></div>`).join('') || '<div class="empty">Nessun dato</div>'}</div>`;
+}
+function periodChips(R) {
+  const t = todayKey(), y = t.slice(0, 4), m = t.slice(0, 7), pm = (() => { let yy = +y, mm = +t.slice(5, 7) - 1; if (!mm) { mm = 12; yy--; } return `${yy}-${pad(mm)}`; })();
+  const lastDay = k => { const [yy, mm] = k.split('-').map(Number); return `${k}-${pad(new Date(Date.UTC(yy, mm, 0)).getUTCDate())}`; };
+  const opts = [['Questo mese', m + '-01', t], ['Mese scorso', pm + '-01', lastDay(pm)], ['Ultimi 90 giorni', plusDays(-90), t], ['Quest\'anno', y + '-01-01', t], ['Tutto', '2000-01-01', '2100-12-31']];
+  return `<div class="chipbar">${opts.map(([l, f, to]) => `<button class="${R.from === f && R.to === to ? 'on' : ''}" onclick="S.rep.from='${f}';S.rep.to='${to}';vReport()">${l}</button>`).join('')}</div>`;
+}
+const whoCancel = a => !a.annullato_da ? 'n/d' : a.annullato_da.includes('(struttura)') ? 'struttura' : a.annullato_da.includes('(amministratore)') ? 'admin' : 'altro';
+function esitoDet(a) {
+  if (a.stato === 'completato') return `Fatto${a.completato_da ? ' · segnato da ' + esc(a.completato_da) : ''}${a.completato_il ? ' il ' + fmtDT(a.completato_il) : ''}`;
+  if (a.stato === 'annullato') return `Annullato${a.annullato_da ? ' da ' + esc(a.annullato_da) : ''}${a.annullato_il ? ' il ' + fmtDT(a.annullato_il) : ''}`;
+  if (a.stato === 'rifiutato') return 'Nessun massaggiatore ha dato la disponibilità';
+  if (a.stato === 'richiesto') return 'In attesa che un massaggiatore confermi';
+  return 'Confermato, da svolgere';
+}
+const esitoCell = a => `${pill(a.stato)}<div class="sub">${esitoDet(a)}</div>`;
+
+async function vReport() {
+  const R = S.rep = S.rep || Object.assign({ from: todayKey().slice(0, 8) + '01', to: todayKey(), str: '', mass: '', serv: '', tab: 'pano' }, vReport.pre || {}); vReport.pre = null;
+  S.gu = await rpc('guadagni').catch(() => []);
+  const G = {}; (S.gu || []).forEach(g => { G[g.appuntamento_id] = g; });
+  const rows = S.appuntamenti.filter(a => { const d = romeDay(a.inizio);
+    return d >= R.from && d <= R.to && (!R.str || a.struttura_id === R.str) && (!R.mass || a.massaggiatore_id === R.mass) && (!R.serv || a.servizio_id === R.serv); }).sort((a, b) => b.inizio.localeCompare(a.inizio));
+  if (S.role === 'admin') return statAdmin(R, rows, G);
+  return statPersonale(R, rows, G);
+}
+function filtriBar(R, opts) {
+  const sel = (key, label, list, all) => `<div><label>${label}</label><select onchange="S.rep.${key}=this.value;vReport()"><option value="">${all}</option>${list.map(([v, l]) => `<option value="${v}" ${R[key] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  return `<div class="card"><div class="head"><h2>Statistiche</h2><button class="btn" onclick="exportReport()">⬇ Scarica Excel</button></div>${periodChips(R)}
     <div class="row"><div><label>Dal</label><input type="date" value="${R.from}" onchange="S.rep.from=this.value;vReport()"></div><div><label>Al</label><input type="date" value="${R.to}" onchange="S.rep.to=this.value;vReport()"></div>
-    ${S.role !== 'struttura' ? `<div><label>Struttura</label><select onchange="S.rep.str=this.value;vReport()"><option value="">Tutte</option>${S.strutture.map(s => `<option value="${s.id}" ${R.str === s.id ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></div>` : ''}
-    ${S.role === 'admin' ? `<div><label>Massaggiatore</label><select onchange="S.rep.mass=this.value;vReport()"><option value="">Tutti</option>${S.massaggiatori.map(m => `<option value="${m.id}" ${R.mass === m.id ? 'selected' : ''}>${esc(massName(m))}</option>`).join('')}</select></div>` : ''}</div>
-    <label class="chips" style="text-transform:none;margin-top:8px"><input type="checkbox" ${R.all ? 'checked' : ''} onchange="S.rep.all=this.checked;vReport()"> includi anche richieste in attesa, annullate e rifiutate (di default solo confermati e completati)</label></div>
-    <div class="grid g4" style="margin-bottom:16px"><div class="kpi"><b>${tot.n}</b><span>Appuntamenti</span></div><div class="kpi"><b>${tot.ore.toFixed(1)}</b><span>Ore di massaggio</span></div>${showEuro ? `<div class="kpi"><b>€ ${tot.euro.toFixed(2)}</b><span>Importo (prezzi inseriti)</span></div>` : ''}</div>
-    ${S.role !== 'struttura' ? tbl('Per struttura', perStr) : ''}${S.role !== 'massaggiatore' ? tbl('Per massaggiatore', perMass) : ''}${tbl('Per servizio', perServ)}${tbl('Per mese', perMese)}`;
-  vReport.rows = { rows, perStr, perMass, perMese, perServ };
+    ${opts.str ? sel('str', 'Struttura', opts.str, 'Tutte') : ''}${opts.mass ? sel('mass', 'Massaggiatore', opts.mass, 'Tutti') : ''}${opts.serv ? sel('serv', 'Servizio', opts.serv, 'Tutti') : ''}</div></div>`;
+}
+const tab = (R, k, l) => `<button class="${R.tab === k ? 'on' : ''}" onclick="S.rep.tab='${k}';vReport()">${l}</button>`;
+const colSt = { completato: '#4f46e5', confermato: '#16a34a', richiesto: '#d97706', annullato: '#dc2626', rifiutato: '#9ca3af' };
+
+function statAdmin(R, rows, G) {
+  const ids = new Set(rows.map(a => a.id)), ric = S.richieste.filter(r => ids.has(r.appuntamento_id));
+  const n = st => rows.filter(a => a.stato === st).length;
+  const fatti = rows.filter(a => a.stato === 'completato'), incasso = fatti.reduce((t, a) => t + Number(a.prezzo || 0), 0);
+  const qm = fatti.reduce((t, a) => t + Number((G[a.id] || {}).guad_mass || 0), 0), qs = fatti.reduce((t, a) => t + Number((G[a.id] || {}).guad_str || 0), 0);
+  const ore = fatti.reduce((t, a) => t + a.durata_min / 60, 0);
+  const html = { };
+  // panoramica
+  const perMese = {}; fatti.forEach(a => { const k = romeDay(a.inizio).slice(0, 7); (perMese[k] = perMese[k] || { n: 0, e: 0 }); perMese[k].n++; perMese[k].e += Number(a.prezzo || 0); });
+  const mesi = Object.keys(perMese).sort();
+  html.pano = `<div class="grid g4" style="margin-bottom:16px">
+      <div class="kpi big"><b>${rows.length}</b><span>Richieste totali</span></div>
+      <div class="kpi big" style="border-color:#c7d2fe;background:#eef2ff"><b>${n('completato')}</b><span>✔ Fatti</span></div>
+      <div class="kpi big" style="border-color:#bbf7d0;background:#f0fdf4"><b>${n('confermato')}</b><span>Confermati, da svolgere</span></div>
+      <div class="kpi big" style="border-color:#fde68a;background:#fffbeb"><b>${n('richiesto')}</b><span>In attesa di risposta</span></div>
+      <div class="kpi big" style="border-color:#fecaca;background:#fef2f2"><b>${n('annullato')}</b><span>✖ Annullati</span></div>
+      <div class="kpi big" style="border-color:#e5e7eb;background:#f9fafb"><b>${n('rifiutato')}</b><span>Nessuna disponibilità</span></div>
+      <div class="kpi big"><b>${ore.toFixed(1)}</b><span>Ore di massaggio fatte</span></div></div>
+    <div class="grid g4" style="margin-bottom:16px">
+      <div class="kpi big"><b>${eur(incasso)}</b><span>Incasso dei massaggi fatti</span></div>
+      <div class="kpi big"><b>${eur(qm)}</b><span>Quota massaggiatori</span></div>
+      <div class="kpi big"><b>${eur(qs)}</b><span>Quota strutture</span></div>
+      <div class="kpi big" style="border-color:#99f6e4"><b>${eur(incasso - qm - qs)}</b><span>Differenza (incasso − quote)</span></div></div>
+    <div class="grid g2"><div class="card"><h3 style="margin-bottom:10px">Com'è andata</h3>${hbars(Object.entries(STATI).map(([k, l]) => [l, n(k), colSt[k]]))}</div>
+    <div class="card"><h3 style="margin-bottom:10px">Massaggi fatti per mese</h3>${hbars(mesi.map(k => [monthName(k), perMese[k].n, '#4f46e5', `${perMese[k].n} · ${eur(perMese[k].e)}`]))}</div></div>
+    <div class="card"><h3 style="margin-bottom:10px">Chi annulla</h3>${(() => { const an = rows.filter(a => a.stato === 'annullato'); const c = k => an.filter(a => whoCancel(a) === k).length;
+      return hbars([['Annullati dalla struttura', c('struttura'), '#dc2626'], ['Annullati dall\'amministratore', c('admin'), '#f97316'], ['Non registrato (storico vecchio)', c('n/d'), '#9ca3af']]); })()}</div>`;
+  // massaggiatori
+  const mlist = S.massaggiatori.filter(m => !R.mass || m.id === R.mass);
+  html.mass = `<div class="card"><h3 style="margin-bottom:4px">Per massaggiatore</h3><p class="muted" style="margin-bottom:8px">Richieste ricevute e come ha risposto. "Senza risposta" = non ha né accettato né rifiutato (la richiesta è stata presa da un collega o è ancora aperta).</p><div class="tw"><table>
+    <tr><th>Massaggiatore</th><th>%</th><th>Richieste ricevute</th><th>Accettate</th><th>Non disponibile</th><th>Senza risposta</th><th>Fatti</th><th>Annullati</th><th>Ore</th><th>Suo guadagno</th></tr>
+    ${mlist.map(m => { const rc = ric.filter(r => r.massaggiatore_id === m.id), mine = rows.filter(a => a.massaggiatore_id === m.id), f = mine.filter(a => a.stato === 'completato');
+      const noRes = rc.filter(r => r.stato === 'inviata' && !rows.some(a => a.id === r.appuntamento_id && a.massaggiatore_id === m.id)).length;
+      return `<tr><td><b>${esc(massName(m))}</b></td><td>${compFor('massaggiatore', m.id) ? Number(compFor('massaggiatore', m.id).perc) + '%' : '—'}</td><td>${rc.length}</td><td>${mine.length}</td><td>${rc.filter(r => r.stato === 'rifiutata').length}</td><td>${noRes}</td><td><b>${f.length}</b></td><td>${mine.filter(a => a.stato === 'annullato').length}</td><td>${f.reduce((t, a) => t + a.durata_min / 60, 0).toFixed(1)}</td><td><b>${eur(f.reduce((t, a) => t + Number((G[a.id] || {}).guad_mass || 0), 0))}</b></td></tr>`; }).join('') || '<tr><td colspan="10" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
+  // strutture
+  const slist = S.strutture.filter(s => !R.str || s.id === R.str);
+  html.str = `<div class="card"><h3 style="margin-bottom:8px">Per struttura</h3><div class="tw"><table>
+    <tr><th>Struttura</th><th>Guadagno</th><th>Richieste</th><th>Fatti</th><th>Annullati<br><span class="muted">dalla struttura / da te</span></th><th>Nessuna disp.</th><th>Incasso</th><th>Quota struttura</th><th>Quota massaggiatori</th></tr>
+    ${slist.map(s => { const r = rows.filter(a => a.struttura_id === s.id), f = r.filter(a => a.stato === 'completato'), an = r.filter(a => a.stato === 'annullato'), c = compFor('struttura', s.id);
+      return `<tr><td><b>${esc(s.nome)}</b></td><td>${c ? (c.modo === 'progressiva' ? 'Progressiva' : Number(c.perc) + '%') : '—'}</td><td>${r.length}</td><td><b>${f.length}</b></td><td>${an.length} <span class="muted">(${an.filter(a => whoCancel(a) === 'struttura').length} / ${an.filter(a => whoCancel(a) === 'admin').length})</span></td><td>${r.filter(a => a.stato === 'rifiutato').length}</td>
+      <td>${eur(f.reduce((t, a) => t + Number(a.prezzo || 0), 0))}</td><td><b>${eur(f.reduce((t, a) => t + Number((G[a.id] || {}).guad_str || 0), 0))}</b></td><td>${eur(f.reduce((t, a) => t + Number((G[a.id] || {}).guad_mass || 0), 0))}</td></tr>`; }).join('') || '<tr><td colspan="9" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
+  // servizi
+  const sv = {}; rows.forEach(a => { const k = a.servizio_nome || '—'; const o = sv[k] = sv[k] || { r: 0, f: 0, e: 0 }; o.r++; if (a.stato === 'completato') { o.f++; o.e += Number(a.prezzo || 0); } });
+  html.serv = `<div class="card"><h3 style="margin-bottom:8px">Per tipo di massaggio</h3><div class="tw"><table><tr><th>Servizio</th><th>Richieste</th><th>Fatti</th><th>Incasso</th></tr>
+    ${Object.entries(sv).sort().map(([k, o]) => `<tr><td><b>${esc(k)}</b></td><td>${o.r}</td><td>${o.f}</td><td>${eur(o.e)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
+  // elenco
+  html.list = `<div class="card"><h3 style="margin-bottom:8px">Ogni singolo massaggio (${rows.length})</h3><div class="tw"><table><tr><th>Quando</th><th>Struttura</th><th>Servizio</th><th>Massaggiatore</th><th>Esito</th><th>Prezzo</th><th>Quota massaggiatore</th><th>Quota struttura</th></tr>
+    ${rows.map(a => { const g = G[a.id]; return `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}<div class="sub">${a.durata_min} min</div></td><td>${esc(strById(a.struttura_id)?.nome)}</td><td>${esc(a.servizio_nome || '')}</td><td>${esc(a.massaggiatore_nome || '—')}</td><td>${esitoCell(a)}</td>
+      <td>${a.prezzo != null ? eur(a.prezzo) : '—'}</td><td>${g ? `${eur(g.guad_mass)}<div class="sub">${Number(g.perc_mass)}%</div>` : '—'}</td><td>${g ? `${eur(g.guad_str)}<div class="sub">${Number(g.perc_str)}% · ${g.n_mese}° del mese</div>` : '—'}</td></tr>`; }).join('') || '<tr><td colspan="8" class="empty">Nessun appuntamento nel periodo</td></tr>'}</table></div></div>`;
+  vReport.rows = { rows, G, ric };
+  $('view').innerHTML = filtriBar(R, { str: S.strutture.map(s => [s.id, s.nome]), mass: S.massaggiatori.map(m => [m.id, massName(m)]), serv: S.servizi.map(x => [x.id, x.nome]) })
+    + `<div class="tabs">${tab(R, 'pano', '📊 Panoramica')}${tab(R, 'mass', '💆 Massaggiatori')}${tab(R, 'str', '🏨 Strutture')}${tab(R, 'serv', '🧴 Servizi')}${tab(R, 'list', '📋 Ogni massaggio')}</div>` + html[R.tab || 'pano'];
+}
+
+function statPersonale(R, rows, G) {
+  const isStr = S.role === 'struttura';
+  rows = rows.filter(a => ['confermato', 'completato', 'annullato'].includes(a.stato));
+  const fatti = rows.filter(a => a.stato === 'completato'), annull = rows.filter(a => a.stato === 'annullato');
+  const gq = a => { const g = G[a.id]; return g ? Number(isStr ? g.guad_str : g.guad_mass) : 0; };
+  const pc = a => { const g = G[a.id]; return g ? Number(isStr ? g.perc_str : g.perc_mass) : null; };
+  const tot = fatti.reduce((t, a) => t + gq(a), 0), ore = fatti.reduce((t, a) => t + a.durata_min / 60, 0);
+  const agg = keyFn => { const m = {}; fatti.forEach(a => { const k = keyFn(a) || '—'; const o = m[k] = m[k] || { n: 0, ore: 0, g: 0 }; o.n++; o.ore += a.durata_min / 60; o.g += gq(a); }); return Object.entries(m).sort((x, y) => x[0].localeCompare(y[0])); };
+  const perStr = agg(a => strById(a.struttura_id)?.nome), perMese = agg(a => romeDay(a.inizio).slice(0, 7)), perServ = agg(a => a.servizio_nome);
+  const c = compFor(isStr ? 'struttura' : 'massaggiatore', isStr ? S.profile.struttura_id : S.profile.massaggiatore_id);
+  const tbl = (title, data, first) => `<div class="card"><h3 style="margin-bottom:8px">${title}</h3><div class="tw"><table><tr><th>${first}</th><th>Massaggi</th><th>Ore</th><th>Il tuo guadagno</th></tr>${data.map(([k, o]) =>
+    `<tr><td>${esc(first === 'Mese' ? monthName(k) : k)}</td><td>${o.n}</td><td>${o.ore.toFixed(1)}</td><td><b>${eur(o.g)}</b></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Nessun dato</td></tr>'}</table></div></div>`;
+  vReport.rows = { rows, G, pers: true, pc, gq };
+  const strOpts = isStr ? null : S.rel.sm.map(r => strById(r.struttura_id)).filter(Boolean).map(s => [s.id, s.nome]);
+  $('view').innerHTML = filtriBar(R, { str: strOpts, serv: S.servizi.map(x => [x.id, x.nome]) })
+    + `<div class="grid g4" style="margin-bottom:16px"><div class="kpi big" style="border-color:#99f6e4"><b>${eur(tot)}</b><span>Il tuo guadagno nel periodo</span></div><div class="kpi big"><b>${fatti.length}</b><span>✔ Massaggi fatti</span></div>
+      <div class="kpi big"><b>${ore.toFixed(1)}</b><span>Ore di massaggio</span></div>${fatti.length ? `<div class="kpi big"><b>${eur(tot / fatti.length)}</b><span>Guadagno medio per massaggio</span></div>` : ''}
+      <div class="kpi big" style="border-color:#fecaca;background:#fef2f2"><b>${annull.length}</b><span>✖ Annullati</span></div>
+      ${c ? `<div class="kpi big"><b>${c.modo === 'progressiva' ? '10–20%' : Number(c.perc) + '%'}</b><span>${c.modo === 'progressiva' ? 'Percentuale progressiva' : 'La tua percentuale'}</span></div>` : ''}</div>
+    <div class="card"><h3 style="margin-bottom:10px">Guadagno per mese</h3>${hbars(perMese.map(([k, o]) => [monthName(k), o.g, '#4f46e5', `${eur(o.g)} · ${o.n} massaggi`]))}</div>
+    ${isStr ? '' : tbl('Per struttura', perStr, 'Struttura')}${tbl('Per tipo di massaggio', perServ, 'Servizio')}
+    <div class="card"><h3 style="margin-bottom:8px">Ogni singolo massaggio</h3><div class="tw"><table><tr><th>Quando</th><th>${isStr ? 'Massaggiatore' : 'Struttura'}</th><th>Servizio</th><th>Esito</th><th>%</th><th>Il tuo guadagno</th></tr>
+    ${rows.map(a => `<tr onclick="openAppt('${a.id}')" style="cursor:pointer"><td>${fmtDT(a.inizio)}<div class="sub">${a.durata_min} min</div></td><td>${esc(isStr ? (a.massaggiatore_nome || '—') : strById(a.struttura_id)?.nome)}</td><td>${esc(a.servizio_nome || '')}</td><td>${esitoCell(a)}</td>
+      <td>${pc(a) != null ? pc(a) + '%' + (isStr && G[a.id] ? `<div class="sub">${G[a.id].n_mese}° del mese</div>` : '') : '—'}</td><td>${a.stato === 'completato' ? `<b>${eur(gq(a))}</b>` : '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Nessun appuntamento nel periodo</td></tr>'}</table></div></div>`;
 }
 function exportReport() {
-  const { rows, perStr, perMass, perMese, perServ } = vReport.rows;
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.sort((a, b) => a.inizio.localeCompare(b.inizio)).map(a => ({
-    Data: fmtDay(romeDay(a.inizio)), Ora: fmtTime(a.inizio), 'Durata (min)': a.durata_min, Servizio: a.servizio_nome || '', Struttura: strById(a.struttura_id)?.nome || '', Massaggiatore: a.massaggiatore_nome || '', Stato: STATI[a.stato], 'Prezzo': a.prezzo ?? '', Note: a.note || '' }))), 'Appuntamenti');
-  const sh = (d, n) => XLSX.utils.json_to_sheet(d.map(([k, o]) => ({ [n]: k, Appuntamenti: o.n, Ore: +o.ore.toFixed(2), Importo: +o.euro.toFixed(2) })));
-  XLSX.utils.book_append_sheet(wb, sh(perStr, 'Struttura'), 'Per struttura'); XLSX.utils.book_append_sheet(wb, sh(perMass, 'Massaggiatore'), 'Per massaggiatore'); XLSX.utils.book_append_sheet(wb, sh(perServ, 'Servizio'), 'Per servizio'); XLSX.utils.book_append_sheet(wb, sh(perMese, 'Mese'), 'Per mese');
-  XLSX.writeFile(wb, `report_${S.rep.from}_${S.rep.to}.xlsx`);
+  const { rows, G, pers, pc, gq } = vReport.rows, wb = XLSX.utils.book_new();
+  const base = a => ({ Data: fmtDay(romeDay(a.inizio)), Ora: fmtTime(a.inizio), 'Durata (min)': a.durata_min, Servizio: a.servizio_nome || '', Struttura: strById(a.struttura_id)?.nome || '', Massaggiatore: a.massaggiatore_nome || '', Esito: STATI[a.stato] + ' - ' + esitoDet(a).replace(/&[a-z#0-9]+;/g, '') });
+  const data = pers ? rows.map(a => ({ ...base(a), '%': pc(a) ?? '', 'Il tuo guadagno': a.stato === 'completato' ? gq(a) : '' }))
+    : rows.map(a => { const g = G[a.id] || {}; return { ...base(a), Prezzo: a.prezzo ?? '', '% massaggiatore': g.perc_mass ?? '', 'Quota massaggiatore': g.guad_mass ?? '', '% struttura': g.perc_str ?? '', 'Quota struttura': g.guad_str ?? '' }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Massaggi');
+  XLSX.writeFile(wb, `statistiche_${S.rep.from}_${S.rep.to}.xlsx`);
 }
 
 // ---------- ACCESSI (admin) ----------
