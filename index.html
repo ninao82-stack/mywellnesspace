@@ -347,7 +347,6 @@ async function vPrenota() {
       <div><label>Servizio</label><select onchange="S.prenota.serv=this.value;vPrenota()"><option value="">— scegli —</option>${servs.map(x => `<option value="${x.id}" ${P.serv === x.id ? 'selected' : ''}>${esc(x.nome)} · ${x.durata_min} min · ${euro(priceFor(P.str, x.id))}</option>`).join('')}</select></div>
       <div><label>Giorno</label><input type="date" min="${todayKey()}" value="${P.giorno}" onchange="S.prenota.giorno=this.value;vPrenota()"></div></div>
     ${sv && sv.descrizione ? `<p class="muted">${esc(sv.descrizione)}</p>` : ''}
-    ${P.str && P.serv && P.giorno ? `<div class="row" style="align-items:end;margin-bottom:12px"><div><label>Oppure scegli tu l'orario</label>${timeBox('tSel')}</div><button class="btn" style="flex:0 0 auto" onclick="askTime()">Richiedi questo orario</button></div>` : ''}
     <div id="slots"><div class="empty">Caricamento orari...</div></div></div>`;
   if (!P.str) { $('slots').innerHTML = '<div class="empty">Scegli la struttura.</div>'; return; }
   if (!servs.length) { $('slots').innerHTML = `<div class="empty">Nessun servizio abilitato per questa struttura.${S.role === 'admin' ? ' Abilitali dalla scheda della struttura (sezione Strutture).' : ' Contatta l\'amministratore.'}</div>`; return; }
@@ -373,17 +372,6 @@ function romeToISO(day, time) {
     t += want - Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
   }
   return new Date(t).toISOString();
-}
-async function askTime() {
-  const P = S.prenota, v = readTime('tSel');
-  if (!v) return toast('Scegli l\'ora e i minuti', true);
-  const inizio = romeToISO(P.giorno, v), t = new Date(inizio);
-  if (t < new Date()) return toast('Quell\'orario è già passato', true);
-  if (S.role !== 'admin' && t < new Date(Date.now() + 3 * 3600 * 1000)) return toast('Servono almeno 3 ore di preavviso', true);
-  const n = await run(() => rpc('conta_liberi', { p_struttura: P.str, p_inizio: inizio, p_servizio: P.serv }));
-  if (n === undefined) return;
-  if (!n) return toast('Nessun massaggiatore disponibile alle ' + v + ' per questo servizio. Prova un altro orario.', true);
-  askSlot(inizio, n);
 }
 function askSlot(inizio, n) {
   const P = S.prenota, st = strById(P.str), sv = servById(P.serv);
